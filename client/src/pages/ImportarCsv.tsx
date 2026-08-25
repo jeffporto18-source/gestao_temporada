@@ -382,8 +382,11 @@ export default function ImportarCsv() {
       // LÍQUIDA — soma exatamente ao "Pago" do repasse que cobre o grupo inteiro — em
       // vez de ser a diária bruta. Usá-la direto como valor bruto fazia ele importar
       // igual ao líquido. Detecta esse modelo comparando a soma do "Valor" das reservas
-      // do grupo com o "Pago" do repasse: quando bate, a diária bruta de verdade é
-      // "Valor" + "Taxa de serviço" (a taxa que a Airbnb já tinha descontado).
+      // do grupo com o "Pago" do repasse: quando bate, esse "Valor" já é o total líquido
+      // recebido (diárias + limpeza, depois da taxa de serviço) — a diária BRUTA sozinha
+      // (sem a limpeza, que o formulário soma à parte) é "Valor" + "Taxa de serviço" −
+      // "Taxa de limpeza". Sem subtrair a limpeza aqui, ela entrava em dobro na Receita
+      // bruta (valorBruto + taxaLimpeza, calculada à parte na tela e no lançamento).
       // Quando não bate (outro modelo de relatório, onde "Valor" já é bruto de fato),
       // usa "Ganhos brutos" para refinar o líquido recebido e as outras taxas — mas só
       // quando o repasse cobre exatamente uma reserva; cobrindo várias, não dá pra saber
@@ -397,7 +400,7 @@ export default function ImportarCsv() {
           const row = { ...item.row };
           if (valorDoGrupoJaELiquido) {
             row.valorLiquidoRecebido = row.valorBruto;
-            row.valorBruto = round2(row.valorBruto + row.taxaAirbnb);
+            row.valorBruto = round2(row.valorBruto + row.taxaAirbnb - row.taxaLimpeza);
           } else if (item.ganhosBrutos !== null) {
             if (g.pago !== null && g.itens.length === 1) {
               row.valorLiquidoRecebido = g.pago;
