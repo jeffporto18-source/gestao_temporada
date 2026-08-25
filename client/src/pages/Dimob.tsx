@@ -67,7 +67,7 @@ export default function Dimob() {
     <div className="max-w-5xl mx-auto">
       <PageHeader
         title="DIMOB"
-        subtitle="Relatório anual com nome, CPF/passaporte e valor total de quem alugou cada unidade durante o ano, em curta temporada e longa duração."
+        subtitle="Relatório anual com nome, CPF/passaporte e valor total de quem alugou cada unidade durante o ano, em curta temporada e longa duração. Reservas de curta temporada seguem regime de caixa (data do recebimento confirmado, não do check-in). O aluguel de longa duração continua pela competência do vencimento."
       />
 
       <div className="flex flex-wrap items-center gap-3 mb-6">

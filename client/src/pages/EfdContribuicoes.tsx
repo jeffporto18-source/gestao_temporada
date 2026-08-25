@@ -67,7 +67,7 @@ export default function EfdContribuicoes() {
     <div className="max-w-5xl mx-auto">
       <PageHeader
         title="EFD Contribuições"
-        subtitle="Relatório mensal com nome, CPF/passaporte e valor de quem alugou cada unidade, em curta temporada e longa duração."
+        subtitle="Relatório mensal com nome, CPF/passaporte e valor de quem alugou cada unidade, em curta temporada e longa duração. Reservas de curta temporada seguem regime de caixa: só entram no mês em que o recebimento foi confirmado (aba Recebimento) — sem confirmação, ainda não aparecem. O aluguel de longa duração continua pela competência do vencimento."
       />
 
       <div className="flex flex-wrap items-center gap-3 mb-6">

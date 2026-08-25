@@ -1997,6 +1997,12 @@ export const appRouter = router({
   relatorios: router({
     // Relatório mensal para a EFD Contribuições: quem alugou cada unidade (curta e longa
     // duração), com nome, CPF/passaporte e valor, mais o total recebido no mês.
+    // Regime de caixa NA PARTE DE CURTA TEMPORADA: conta pela data em que o dinheiro
+    // efetivamente caiu (recebimento confirmado), não pela data do check-in — reserva sem
+    // recebimento confirmado ainda não entra em nenhum mês.
+    // A parte de longa duração continua por competência (vencimento): mudar pra regime de caixa
+    // aqui esvaziaria o relatório de qualquer empresa com parcela vencida ainda não baixada em
+    // "Aluguéis a Receber" — é uma troca maior, que precisa de decisão do cliente antes.
     efdContribuicoes: financeiroProcedure
       .input(z.object({ competencia: z.string().regex(/^\d{4}-\d{2}$/) }))
       .query(async ({ ctx, input }) => {
@@ -2004,7 +2010,7 @@ export const appRouter = router({
         const props = await db.listProperties(ctx.ownerId);
         const propMap = new Map(props.map((p) => [p.id, p]));
 
-        const reservas = await db.listReservations(ctx.ownerId, undefined, input.competencia);
+        const reservas = await db.listReservationsRecebidasNaCompetencia(ctx.ownerId, input.competencia);
         const parcelas = await db.listContractRentChargesByCompetencia(ctx.ownerId, input.competencia);
 
         type Item = {
@@ -2057,6 +2063,8 @@ export const appRouter = router({
 
     // DIMOB: relatório anual de quem alugou cada unidade (curta e longa duração) durante
     // o ano inteiro, com nome, CPF/passaporte e valor total recebido no ano por locação.
+    // Regime de caixa NA PARTE DE CURTA TEMPORADA, igual à EFD Contribuições acima. A parte de
+    // longa duração continua por competência — ver o comentário na EFD Contribuições.
     dimob: financeiroProcedure
       .input(z.object({ ano: z.string().regex(/^\d{4}$/) }))
       .query(async ({ ctx, input }) => {
@@ -2064,7 +2072,7 @@ export const appRouter = router({
         const props = await db.listProperties(ctx.ownerId);
         const propMap = new Map(props.map((p) => [p.id, p]));
 
-        const reservas = await db.listReservationsByYear(ctx.ownerId, input.ano);
+        const reservas = await db.listReservationsRecebidasNoAno(ctx.ownerId, input.ano);
         const parcelas = await db.listContractRentChargesByYear(ctx.ownerId, input.ano);
 
         type Item = {

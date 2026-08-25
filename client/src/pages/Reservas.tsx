@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2, FileText, CalendarDays, CheckCircle2, Loader2, Pencil, Upload, ExternalLink, User, Wallet } from "lucide-react";
 import { brl, competenciaAtual, formatCpfCnpj, formatDate } from "@/lib/format";
+import { dataSugeridaRecebimentoAirbnb } from "@/lib/diaUtil";
 import { PageHeader, EmptyState } from "./Clientes";
 import { UnitPeriodFilter } from "@/components/UnitPeriodFilter";
 
@@ -489,6 +490,7 @@ function RecebimentoDialog({
   onOpenChange: (open: boolean) => void;
   reserva: {
     id: number;
+    checkin: string;
     valorLiquidoRecebido: string;
     dataRecebimento: string | null;
     valorRecebido: string | null;
@@ -505,7 +507,10 @@ function RecebimentoDialog({
       const jaConfirmado = reserva.valorRecebido != null && Number(reserva.valorRecebido) !== valorAirbnb;
       setModo(jaConfirmado ? "alterar" : "confirmar");
       setValor(reserva.valorRecebido != null ? String(Number(reserva.valorRecebido)) : String(valorAirbnb));
-      setData(reserva.dataRecebimento || new Date().toISOString().slice(0, 10));
+      // Sugestão: check-in + 1 dia útil (fim de semana/feriado nacional) — o Airbnb libera o
+      // repasse no dia seguinte ao check-in, e adia se cair fora do dia útil bancário. É só uma
+      // sugestão; confira e ajuste se o repasse realmente caiu em outra data.
+      setData(reserva.dataRecebimento || dataSugeridaRecebimentoAirbnb(reserva.checkin));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, reserva.id]);

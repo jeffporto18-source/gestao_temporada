@@ -318,6 +318,30 @@ export async function listReservationsByYear(ownerId: number, ano: string) {
     .orderBy(desc(reservations.checkin));
 }
 
+/**
+ * Reservas com recebimento CONFIRMADO cuja data de recebimento cai no mês informado — regime de
+ * caixa (usado na EFD Contribuições). Reservas sem recebimento confirmado ainda não entram: só
+ * contam quando o dinheiro realmente caiu na conta, no mês em que caiu (não no mês do check-in).
+ */
+export async function listReservationsRecebidasNaCompetencia(ownerId: number, competencia: string) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(reservations)
+    .where(and(eq(reservations.ownerId, ownerId), like(reservations.dataRecebimento, `${competencia}-%`)))
+    .orderBy(desc(reservations.dataRecebimento));
+}
+
+/** Mesma ideia acima, mas para o ano inteiro — usado no DIMOB. */
+export async function listReservationsRecebidasNoAno(ownerId: number, ano: string) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(reservations)
+    .where(and(eq(reservations.ownerId, ownerId), like(reservations.dataRecebimento, `${ano}-%`)))
+    .orderBy(desc(reservations.dataRecebimento));
+}
+
 export async function getReservation(ownerId: number, id: number) {
   const db = await requireDb();
   const rows = await db.select().from(reservations).where(and(eq(reservations.ownerId, ownerId), eq(reservations.id, id))).limit(1);
