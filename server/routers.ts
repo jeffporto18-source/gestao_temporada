@@ -611,6 +611,8 @@ export const appRouter = router({
           tipoFinanciamento: z.enum(["financiamento", "consorcio"]).optional(),
           valorParcela: z.number().min(0).optional(),
           socioId: z.number().optional(),
+          socio2Id: z.number().optional(),
+          socio3Id: z.number().optional(),
         }),
       )
       .mutation(({ ctx, input }) =>
@@ -629,6 +631,8 @@ export const appRouter = router({
           tipoFinanciamento: input.tipoFinanciamento ?? null,
           valorParcela: input.valorParcela !== undefined ? String(input.valorParcela) : null,
           socioId: input.socioId ?? null,
+          socio2Id: input.socio2Id ?? null,
+          socio3Id: input.socio3Id ?? null,
         }),
       ),
     update: escritaProcedure
@@ -648,6 +652,8 @@ export const appRouter = router({
           tipoFinanciamento: z.enum(["financiamento", "consorcio"]).nullable().optional(),
           valorParcela: z.number().min(0).nullable().optional(),
           socioId: z.number().nullable().optional(),
+          socio2Id: z.number().nullable().optional(),
+          socio3Id: z.number().nullable().optional(),
         }),
       )
       .mutation(({ ctx, input }) => {

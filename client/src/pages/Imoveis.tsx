@@ -49,12 +49,14 @@ interface PropertyForm {
   tipoFinanciamento: "financiamento" | "consorcio";
   valorParcela: string;
   socioId: string;
+  socio2Id: string;
+  socio3Id: string;
 }
 
 const emptyForm: PropertyForm = {
   clientId: "", apelido: "", endereco: "", comissao: "20", custoFaxina: "150", tipoLocacao: "curta",
   tipoAdministracao: "propria", imobiliariaId: "", gestorId: "", financiado: "nao", tipoFinanciamento: "financiamento", valorParcela: "",
-  socioId: "",
+  socioId: "", socio2Id: "", socio3Id: "",
 };
 
 const TIPO_ADMIN_LABELS: Record<PropertyForm["tipoAdministracao"], string> = {
@@ -113,6 +115,8 @@ export default function Imoveis() {
       tipoFinanciamento: (p.tipoFinanciamento as PropertyForm["tipoFinanciamento"]) || "financiamento",
       valorParcela: p.valorParcela ? String(Number(p.valorParcela)) : "",
       socioId: p.socioId ? String(p.socioId) : "",
+      socio2Id: p.socio2Id ? String(p.socio2Id) : "",
+      socio3Id: p.socio3Id ? String(p.socio3Id) : "",
     });
     setOpen(true);
   };
@@ -139,6 +143,8 @@ export default function Imoveis() {
       tipoFinanciamento: form.financiado === "sim" ? form.tipoFinanciamento : undefined,
       valorParcela: form.financiado === "sim" && form.valorParcela ? Number(form.valorParcela) : undefined,
       socioId: form.tipoLocacao === "longa" && form.socioId ? Number(form.socioId) : undefined,
+      socio2Id: form.tipoLocacao === "longa" && form.socio2Id ? Number(form.socio2Id) : undefined,
+      socio3Id: form.tipoLocacao === "longa" && form.socio3Id ? Number(form.socio3Id) : undefined,
     };
     if (editId) {
       update.mutate({
@@ -285,15 +291,31 @@ export default function Imoveis() {
 
                 {form.tipoLocacao === "longa" && (
                   <div className="grid gap-1.5">
-                    <Label>Sócio</Label>
-                    <Select value={form.socioId} onValueChange={(v) => setForm({ ...form, socioId: v })}>
-                      <SelectTrigger><SelectValue placeholder="Selecione o sócio" /></SelectTrigger>
-                      <SelectContent>
-                        {socios?.map((s) => (
-                          <SelectItem key={s.id} value={String(s.id)}>{s.nome}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label>Sócios</Label>
+                    <p className="text-xs text-muted-foreground -mt-1">Até 3, para imóvel de mais de um sócio (ex.: imóvel de família).</p>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      {(["socioId", "socio2Id", "socio3Id"] as const).map((campo, idx) => {
+                        const escolhidosNosOutros = (["socioId", "socio2Id", "socio3Id"] as const)
+                          .filter((c) => c !== campo)
+                          .map((c) => form[c])
+                          .filter(Boolean);
+                        return (
+                          <Select
+                            key={campo}
+                            value={form[campo]}
+                            onValueChange={(v) => setForm({ ...form, [campo]: v === "nenhum" ? "" : v })}
+                          >
+                            <SelectTrigger><SelectValue placeholder={`Sócio ${idx + 1}`} /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="nenhum">Nenhum</SelectItem>
+                              {socios?.filter((s) => !escolhidosNosOutros.includes(String(s.id))).map((s) => (
+                                <SelectItem key={s.id} value={String(s.id)}>{s.nome}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 

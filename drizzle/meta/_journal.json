@@ -274,6 +274,13 @@
       "when": 1786830421121,
       "tag": "0038_add_ledger_charges",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "5",
+      "when": 1786830481121,
+      "tag": "0039_add_socio2_socio3",
+      "breakpoints": true
     }
   ]
 }

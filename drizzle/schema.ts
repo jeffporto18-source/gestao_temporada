@@ -131,8 +131,12 @@ export const properties = mysqlTable("properties", {
   financiado: mysqlEnum("financiado", ["sim", "nao"]).notNull().default("nao"),
   tipoFinanciamento: mysqlEnum("tipoFinanciamento", ["financiamento", "consorcio"]),
   valorParcela: decimal("valorParcela", { precision: 10, scale: 2 }),
-  // Sócio responsável pelo imóvel (imóveis de longa duração)
+  // Sócios responsáveis pelo imóvel (imóveis de longa duração) — até 3, quando o imóvel é de
+  // mais de um sócio (comum em imóvel de família). socioId é o primeiro; os outros dois são
+  // opcionais.
   socioId: int("socioId"),
+  socio2Id: int("socio2Id"),
+  socio3Id: int("socio3Id"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
