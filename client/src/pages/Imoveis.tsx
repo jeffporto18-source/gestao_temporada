@@ -305,7 +305,7 @@ export default function Imoveis() {
                             value={form[campo]}
                             onValueChange={(v) => setForm({ ...form, [campo]: v === "nenhum" ? "" : v })}
                           >
-                            <SelectTrigger><SelectValue placeholder={`Sócio ${idx + 1}`} /></SelectTrigger>
+                            <SelectTrigger className="w-full"><SelectValue placeholder={`Sócio ${idx + 1}`} /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="nenhum">Nenhum</SelectItem>
                               {socios?.filter((s) => !escolhidosNosOutros.includes(String(s.id))).map((s) => (
