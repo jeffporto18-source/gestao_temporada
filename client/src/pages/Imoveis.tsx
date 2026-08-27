@@ -76,6 +76,7 @@ export default function Imoveis() {
   const { data: imobiliarias } = trpc.imobiliarias.list.useQuery();
   const { data: gestores } = trpc.curtaManagers.list.useQuery();
   const { data: socios } = trpc.socios.list.useQuery();
+  const { data: socioGrupos } = trpc.socioGrupos.list.useQuery();
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState<PropertyForm>(emptyForm);
@@ -293,6 +294,27 @@ export default function Imoveis() {
                   <div className="grid gap-1.5">
                     <Label>Sócios</Label>
                     <p className="text-xs text-muted-foreground -mt-1">Até 3, para imóvel de mais de um sócio (ex.: imóvel de família).</p>
+                    {!!socioGrupos?.length && (
+                      <Select
+                        value=""
+                        onValueChange={(v) => {
+                          const membros = (socios ?? []).filter((s) => s.grupoId === Number(v)).slice(0, 3);
+                          setForm({
+                            ...form,
+                            socioId: membros[0] ? String(membros[0].id) : "",
+                            socio2Id: membros[1] ? String(membros[1].id) : "",
+                            socio3Id: membros[2] ? String(membros[2].id) : "",
+                          });
+                        }}
+                      >
+                        <SelectTrigger className="w-full h-8 text-xs"><SelectValue placeholder="Preencher a partir de um grupo..." /></SelectTrigger>
+                        <SelectContent>
+                          {socioGrupos.map((g) => (
+                            <SelectItem key={g.id} value={String(g.id)}>{g.nome}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <div className="grid gap-2 sm:grid-cols-3">
                       {(["socioId", "socio2Id", "socio3Id"] as const).map((campo, idx) => {
                         const escolhidosNosOutros = (["socioId", "socio2Id", "socio3Id"] as const)

@@ -17,6 +17,7 @@ import {
   DEFAULT_GUARANTEE_TYPES,
   fornecedores,
   socios,
+  socioGrupos,
   inventoryItems,
   longTermContracts,
   contractRentCharges,
@@ -32,6 +33,7 @@ import {
   InsertGuaranteeType,
   InsertFornecedor,
   InsertSocio,
+  InsertSocioGrupo,
   InsertInventoryItem,
   InsertLongTermContract,
   InsertContractRentCharge,
@@ -852,7 +854,7 @@ export async function createSocio(data: InsertSocio) {
   await db.insert(socios).values(data);
 }
 
-export async function updateSocio(ownerId: number, id: number, data: Partial<Pick<InsertSocio, "nome" | "cpf">>) {
+export async function updateSocio(ownerId: number, id: number, data: Partial<Pick<InsertSocio, "nome" | "cpf" | "grupoId">>) {
   const db = await requireDb();
   await db.update(socios).set(data).where(and(eq(socios.ownerId, ownerId), eq(socios.id, id)));
 }
@@ -860,6 +862,30 @@ export async function updateSocio(ownerId: number, id: number, data: Partial<Pic
 export async function deleteSocio(ownerId: number, id: number) {
   const db = await requireDb();
   await db.delete(socios).where(and(eq(socios.ownerId, ownerId), eq(socios.id, id)));
+}
+
+// -------------------------------------------------------------- grupos de sócios
+export async function listSocioGrupos(ownerId: number) {
+  const db = await requireDb();
+  return db.select().from(socioGrupos).where(eq(socioGrupos.ownerId, ownerId)).orderBy(socioGrupos.nome);
+}
+
+export async function createSocioGrupo(data: InsertSocioGrupo) {
+  const db = await requireDb();
+  const res = await db.insert(socioGrupos).values(data);
+  return (res as unknown as { insertId: number }[])[0]?.insertId ?? (res as unknown as { insertId: number }).insertId;
+}
+
+export async function updateSocioGrupo(ownerId: number, id: number, data: Partial<Pick<InsertSocioGrupo, "nome">>) {
+  const db = await requireDb();
+  await db.update(socioGrupos).set(data).where(and(eq(socioGrupos.ownerId, ownerId), eq(socioGrupos.id, id)));
+}
+
+export async function deleteSocioGrupo(ownerId: number, id: number) {
+  const db = await requireDb();
+  // Sócios do grupo não são apagados — só ficam sem grupo.
+  await db.update(socios).set({ grupoId: null }).where(and(eq(socios.ownerId, ownerId), eq(socios.grupoId, id)));
+  await db.delete(socioGrupos).where(and(eq(socioGrupos.ownerId, ownerId), eq(socioGrupos.id, id)));
 }
 
 // -------------------------------------------------------------- inventory items

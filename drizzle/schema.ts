@@ -373,13 +373,30 @@ export type Fornecedor = typeof fornecedores.$inferSelect;
 export type InsertFornecedor = typeof fornecedores.$inferInsert;
 
 /**
- * Sócios da empresa (administradora), apenas nome e CPF.
+ * Grupo de sócios: mesmo grupo familiar/societário recebe o rendimento de um imóvel junto — ex.
+ * "Luiz Eduardo" (sozinho) e "Felipe/Guilherme/Fernanda" (juntos). Escolher o grupo no imóvel
+ * preenche os até 3 sócios de uma vez, em vez de escolher pessoa por pessoa toda vez.
+ */
+export const socioGrupos = mysqlTable("socio_grupos", {
+  id: int("id").autoincrement().primaryKey(),
+  ownerId: int("ownerId").notNull(),
+  nome: varchar("nome", { length: 150 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type SocioGrupo = typeof socioGrupos.$inferSelect;
+export type InsertSocioGrupo = typeof socioGrupos.$inferInsert;
+
+/**
+ * Sócios da empresa (administradora), apenas nome e CPF. Um sócio pode pertencer a um grupo
+ * (opcional) — quem não tem grupo continua selecionável individualmente no imóvel.
  */
 export const socios = mysqlTable("socios", {
   id: int("id").autoincrement().primaryKey(),
   ownerId: int("ownerId").notNull(),
   nome: varchar("nome", { length: 150 }).notNull(),
   cpf: varchar("cpf", { length: 20 }).notNull(),
+  grupoId: int("grupoId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

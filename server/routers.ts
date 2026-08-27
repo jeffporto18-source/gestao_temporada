@@ -974,15 +974,27 @@ export const appRouter = router({
   socios: router({
     list: empresaProcedure.query(({ ctx }) => db.listSocios(ctx.ownerId)),
     create: escritaProcedure
-      .input(z.object({ nome: z.string().min(1), cpf: z.string().min(1) }))
-      .mutation(({ ctx, input }) => db.createSocio({ ownerId: ctx.ownerId, nome: input.nome, cpf: input.cpf })),
+      .input(z.object({ nome: z.string().min(1), cpf: z.string().min(1), grupoId: z.number().nullable().optional() }))
+      .mutation(({ ctx, input }) => db.createSocio({ ownerId: ctx.ownerId, nome: input.nome, cpf: input.cpf, grupoId: input.grupoId ?? null })),
     update: escritaProcedure
-      .input(z.object({ id: z.number(), nome: z.string().optional(), cpf: z.string().optional() }))
+      .input(z.object({ id: z.number(), nome: z.string().optional(), cpf: z.string().optional(), grupoId: z.number().nullable().optional() }))
       .mutation(({ ctx, input }) => {
         const { id, ...rest } = input;
         return db.updateSocio(ctx.ownerId, id, rest);
       }),
     delete: escritaProcedure.input(z.object({ id: z.number() })).mutation(({ ctx, input }) => db.deleteSocio(ctx.ownerId, input.id)),
+  }),
+
+  // ------------------------------------------------------------- grupos de sócios
+  socioGrupos: router({
+    list: empresaProcedure.query(({ ctx }) => db.listSocioGrupos(ctx.ownerId)),
+    create: escritaProcedure
+      .input(z.object({ nome: z.string().min(1) }))
+      .mutation(({ ctx, input }) => db.createSocioGrupo({ ownerId: ctx.ownerId, nome: input.nome })),
+    update: escritaProcedure
+      .input(z.object({ id: z.number(), nome: z.string().min(1) }))
+      .mutation(({ ctx, input }) => db.updateSocioGrupo(ctx.ownerId, input.id, { nome: input.nome })),
+    delete: escritaProcedure.input(z.object({ id: z.number() })).mutation(({ ctx, input }) => db.deleteSocioGrupo(ctx.ownerId, input.id)),
   }),
 
   // -------------------------------------------------------- inventory items

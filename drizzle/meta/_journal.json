@@ -281,6 +281,13 @@
       "when": 1786830481121,
       "tag": "0039_add_socio2_socio3",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "5",
+      "when": 1786830541121,
+      "tag": "0040_add_socio_grupos",
+      "breakpoints": true
     }
   ]
 }
