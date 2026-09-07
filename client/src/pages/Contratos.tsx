@@ -51,6 +51,7 @@ interface ContractForm {
   prazoIndeterminadoPrazoReajusteMeses: string;
   renovacaoNovoContratoDataInicio: string;
   renovacaoNovoContratoPrazoMeses: string;
+  renovacaoNovoContratoValor: string;
   condominioPor: CostResponsibility;
   iptuPor: CostResponsibility;
 }
@@ -69,7 +70,7 @@ const emptyForm: ContractForm = {
   nomeInquilino: "", cpfCnpjInquilino: "", contatoInquilino: "", telefoneInquilino: "", celularInquilino: "",
   whatsappInquilino: "", emailInquilino: "", tipoGarantia: "", comissaoPct: "0", tipoAdministracao: "propria", imobiliariaId: "",
   renovacaoAutomatica: "", prazoIndeterminadoDataInicio: "", prazoIndeterminadoValor: "", prazoIndeterminadoPrazoReajusteMeses: "",
-  renovacaoNovoContratoDataInicio: "", renovacaoNovoContratoPrazoMeses: "12",
+  renovacaoNovoContratoDataInicio: "", renovacaoNovoContratoPrazoMeses: "12", renovacaoNovoContratoValor: "",
   condominioPor: "proprietario", iptuPor: "proprietario",
 };
 
@@ -288,6 +289,7 @@ export default function Contratos() {
         prazoIndeterminadoPrazoReajusteMeses: form.renovacaoAutomatica === "prazo_indeterminado" && form.prazoIndeterminadoPrazoReajusteMeses ? Number(form.prazoIndeterminadoPrazoReajusteMeses) : null,
         renovacaoNovoContratoDataInicio: form.renovacaoAutomatica === "novo_contrato" ? (form.renovacaoNovoContratoDataInicio || null) : null,
         renovacaoNovoContratoPrazoMeses: form.renovacaoAutomatica === "novo_contrato" && form.renovacaoNovoContratoPrazoMeses ? Number(form.renovacaoNovoContratoPrazoMeses) : null,
+        renovacaoNovoContratoValor: form.renovacaoAutomatica === "novo_contrato" && form.renovacaoNovoContratoValor ? Number(form.renovacaoNovoContratoValor) : null,
         condominioPor: form.condominioPor,
         iptuPor: form.iptuPor,
       });
@@ -323,6 +325,7 @@ export default function Contratos() {
       prazoIndeterminadoPrazoReajusteMeses: form.renovacaoAutomatica === "prazo_indeterminado" && form.prazoIndeterminadoPrazoReajusteMeses ? Number(form.prazoIndeterminadoPrazoReajusteMeses) : undefined,
       renovacaoNovoContratoDataInicio: form.renovacaoAutomatica === "novo_contrato" ? (form.renovacaoNovoContratoDataInicio || undefined) : undefined,
       renovacaoNovoContratoPrazoMeses: form.renovacaoAutomatica === "novo_contrato" && form.renovacaoNovoContratoPrazoMeses ? Number(form.renovacaoNovoContratoPrazoMeses) : undefined,
+      renovacaoNovoContratoValor: form.renovacaoAutomatica === "novo_contrato" && form.renovacaoNovoContratoValor ? Number(form.renovacaoNovoContratoValor) : undefined,
       condominioPor: form.condominioPor,
       iptuPor: form.iptuPor,
     });
@@ -360,6 +363,7 @@ export default function Contratos() {
       prazoIndeterminadoPrazoReajusteMeses: c.prazoIndeterminadoPrazoReajusteMeses ? String(c.prazoIndeterminadoPrazoReajusteMeses) : "",
       renovacaoNovoContratoDataInicio: c.renovacaoNovoContratoDataInicio || "",
       renovacaoNovoContratoPrazoMeses: c.renovacaoNovoContratoPrazoMeses ? String(c.renovacaoNovoContratoPrazoMeses) : "12",
+      renovacaoNovoContratoValor: c.renovacaoNovoContratoValor ? String(c.renovacaoNovoContratoValor) : "",
       condominioPor: (c.condominioPor as CostResponsibility) || "proprietario",
       iptuPor: (c.iptuPor as CostResponsibility) || "proprietario",
     });
@@ -723,7 +727,7 @@ export default function Contratos() {
                   {form.renovacaoAutomatica === "novo_contrato" && (
                     <div className="rounded-lg border border-border bg-secondary/50 p-3 space-y-3">
                       <p className="text-xs font-medium text-muted-foreground">Novo contrato</p>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-3 gap-3">
                         <div className="grid gap-1.5">
                           <Label className="text-xs">Início</Label>
                           <DateInput
@@ -738,6 +742,15 @@ export default function Contratos() {
                             onChange={(e) => setForm({ ...form, renovacaoNovoContratoPrazoMeses: e.target.value })}
                             type="number"
                             min="1"
+                          />
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">Valor do aluguel (R$)</Label>
+                          <Input
+                            value={form.renovacaoNovoContratoValor}
+                            onChange={(e) => setForm({ ...form, renovacaoNovoContratoValor: e.target.value })}
+                            type="number"
+                            step="0.01"
                           />
                         </div>
                       </div>
@@ -960,6 +973,14 @@ export default function Contratos() {
                       {selectedContract.prazoIndeterminadoDataInicio ? ` desde ${formatDate(selectedContract.prazoIndeterminadoDataInicio)}` : ""}
                       {selectedContract.prazoIndeterminadoValor ? ` · ${brl(selectedContract.prazoIndeterminadoValor)}` : ""}
                       {selectedContract.prazoIndeterminadoPrazoReajusteMeses ? ` · reajuste a cada ${selectedContract.prazoIndeterminadoPrazoReajusteMeses} meses` : ""}
+                    </p>
+                  )}
+                  {selectedContract.renovacaoAutomatica === "novo_contrato" && selectedContract.renovacaoNovoContratoDataInicio && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Renovação: novo contrato {formatDate(selectedContract.renovacaoNovoContratoDataInicio)}–
+                      {selectedContract.renovacaoNovoContratoDataFim ? formatDate(selectedContract.renovacaoNovoContratoDataFim) : "—"}
+                      {selectedContract.renovacaoNovoContratoValor ? ` · ${brl(selectedContract.renovacaoNovoContratoValor)}` : ""}
+                      {selectedContract.renovacaoNovoContratoDataReajuste ? ` · reajuste em ${formatDate(selectedContract.renovacaoNovoContratoDataReajuste)}` : ""}
                     </p>
                   )}
                 </div>

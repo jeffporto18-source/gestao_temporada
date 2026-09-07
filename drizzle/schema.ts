@@ -510,6 +510,7 @@ export const longTermContracts = mysqlTable("long_term_contracts", {
   renovacaoNovoContratoPrazoMeses: int("renovacaoNovoContratoPrazoMeses"),
   renovacaoNovoContratoDataFim: date("renovacaoNovoContratoDataFim", { mode: "string" }),
   renovacaoNovoContratoDataReajuste: date("renovacaoNovoContratoDataReajuste", { mode: "string" }),
+  renovacaoNovoContratoValor: decimal("renovacaoNovoContratoValor", { precision: 12, scale: 2 }),
   // Quem paga condomínio e IPTU enquanto este contrato vigora. `inquilino_direto` = ele paga o
   // boleto no nome dele e o dinheiro nunca passa pela administradora; `inquilino_via_repasse` =
   // vem junto com o aluguel e a administradora repassa. Nos dois casos o custo NÃO é despesa do

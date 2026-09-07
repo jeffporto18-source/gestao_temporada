@@ -295,6 +295,13 @@
       "when": 1786830601121,
       "tag": "0041_add_renovacao_novo_contrato",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "5",
+      "when": 1786830661121,
+      "tag": "0042_add_renovacao_novo_contrato_valor",
+      "breakpoints": true
     }
   ]
 }
