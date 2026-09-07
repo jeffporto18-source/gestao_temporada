@@ -426,7 +426,7 @@ export default function Contratos() {
               >
                 <Plus className="mr-1 h-3.5 w-3.5" /> Novo contrato
               </Button>
-              <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+              <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle className="font-serif">
                     {savedContractId ? "Anexar documentos" : editingId !== null ? "Editar contrato" : "Novo contrato"}
