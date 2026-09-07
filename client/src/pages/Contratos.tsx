@@ -636,8 +636,10 @@ export default function Contratos() {
                         Sem carência
                       </label>
                     </div>
+                  </div>
+                  <div className={!semCarencia ? "grid grid-cols-4 gap-3" : "grid grid-cols-2 gap-3"}>
                     {!semCarencia && (
-                      <div className="grid grid-cols-2 gap-3">
+                      <>
                         <div className="grid gap-1.5">
                           <Label className="text-xs">Início</Label>
                           <DateInput value={form.carenciaInicio} onChange={(v) => setForm({ ...form, carenciaInicio: v })} />
@@ -646,10 +648,8 @@ export default function Contratos() {
                           <Label className="text-xs">Fim</Label>
                           <DateInput value={form.carenciaFim} onChange={(v) => setForm({ ...form, carenciaFim: v })} />
                         </div>
-                      </div>
+                      </>
                     )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
                     <div className="grid gap-1.5">
                       <Label>Índice de correção</Label>
                       <Select value={form.indiceCorrecao} onValueChange={(v) => setForm({ ...form, indiceCorrecao: v })}>
