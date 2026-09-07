@@ -731,7 +731,7 @@ export default function Contratos() {
                   {form.renovacaoAutomatica === "novo_contrato" && (
                     <div className="rounded-lg border border-border bg-secondary/50 p-3 space-y-3">
                       <p className="text-xs font-medium text-muted-foreground">Novo contrato</p>
-                      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${4 + renovacaoNovoContratoNumReajustes}, minmax(0, 1fr))` }}>
+                      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${3 + renovacaoNovoContratoNumReajustes}, minmax(0, 1fr))` }}>
                         <div className="grid gap-1.5">
                           <Label className="text-xs">Início</Label>
                           <DateInput
@@ -749,15 +749,6 @@ export default function Contratos() {
                           />
                         </div>
                         <div className="grid gap-1.5">
-                          <Label className="text-xs">Valor do aluguel (R$)</Label>
-                          <Input
-                            value={form.renovacaoNovoContratoValor}
-                            onChange={(e) => setForm({ ...form, renovacaoNovoContratoValor: e.target.value })}
-                            type="number"
-                            step="0.01"
-                          />
-                        </div>
-                        <div className="grid gap-1.5">
                           <Label className="text-xs">Fim</Label>
                           <Input value={renovacaoNovoContratoDataFimCalculada ? formatDate(renovacaoNovoContratoDataFimCalculada) : ""} disabled placeholder="Calculado" />
                         </div>
@@ -768,17 +759,15 @@ export default function Contratos() {
                           </div>
                         ))}
                       </div>
-                      {editingId === null && (
-                        <p className="text-xs text-muted-foreground">Salve o contrato para habilitar o anexo.</p>
-                      )}
-                      <DocumentoUploadRow
-                        label="Contrato renovado"
-                        url={savedDocs.renovacaoContratoUrl}
-                        uploading={uploadingRenovacao}
-                        accept="application/pdf,image/jpeg,image/png,image/webp"
-                        disabled={editingId === null}
-                        onUpload={(file) => editingId !== null && handleRenovacaoContratoUpload(editingId, file)}
-                      />
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs">Valor do aluguel (R$)</Label>
+                        <Input
+                          value={form.renovacaoNovoContratoValor}
+                          onChange={(e) => setForm({ ...form, renovacaoNovoContratoValor: e.target.value })}
+                          type="number"
+                          step="0.01"
+                        />
+                      </div>
                     </div>
                   )}
 
@@ -845,6 +834,16 @@ export default function Contratos() {
                       disabled={editingId === null}
                       onUpload={(file) => editingId !== null && handleApoliceSeguroUpload(editingId, file)}
                     />
+                    {form.renovacaoAutomatica === "novo_contrato" && (
+                      <DocumentoUploadRow
+                        label="Contrato renovado"
+                        url={savedDocs.renovacaoContratoUrl}
+                        uploading={uploadingRenovacao}
+                        accept="application/pdf,image/jpeg,image/png,image/webp"
+                        disabled={editingId === null}
+                        onUpload={(file) => editingId !== null && handleRenovacaoContratoUpload(editingId, file)}
+                      />
+                    )}
                   </div>
                 </div>
                 <DialogFooter>
