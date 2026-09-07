@@ -575,54 +575,50 @@ export default function Contratos() {
                     </div>
                   </div>
 
-                  <div className={numReajustes > 0 ? "grid grid-cols-4 gap-3" : "grid grid-cols-3 gap-3"}>
+                  <div className={editingId === null ? "grid grid-cols-5 gap-2" : "grid grid-cols-4 gap-2"}>
                     <div className="grid gap-1.5">
-                      <Label>Início do contrato</Label>
+                      <Label className="text-xs">Início do contrato</Label>
                       <DateInput value={form.dataInicio} onChange={(v) => setForm({ ...form, dataInicio: v })} />
                     </div>
                     <div className="grid gap-1.5">
-                      <Label>Prazo (meses)</Label>
+                      <Label className="text-xs">Prazo (meses)</Label>
                       <Input value={form.prazoMeses} onChange={(e) => setForm({ ...form, prazoMeses: e.target.value })} type="number" min="1" />
                     </div>
                     <div className="grid gap-1.5">
-                      <Label>Fim do contrato</Label>
+                      <Label className="text-xs">Fim do contrato</Label>
                       <Input value={form.dataInicio ? formatDate(dataFimCalculada) : ""} disabled placeholder="Calculado" />
                     </div>
-                    {numReajustes > 0 && (
-                      <div className="grid gap-1.5">
-                        <Label>{numReajustes > 1 ? "1º reajuste" : "Reajuste"}</Label>
-                        <Input value={datasReajusteCalculadas[0] ? formatDate(datasReajusteCalculadas[0]) : ""} disabled placeholder="Calculado" />
-                        {form.valorAluguel && <p className="text-[11px] text-muted-foreground">{brl(Number(form.valorAluguel))}</p>}
-                      </div>
-                    )}
-                  </div>
-                  {datasReajusteCalculadas.length > 1 && (
-                    <div className="grid grid-cols-2 gap-3">
-                      {datasReajusteCalculadas.slice(1).map((data, i) => (
-                        <div key={data} className="grid gap-1.5">
-                          <Label>{`${i + 2}º reajuste`}</Label>
-                          <Input value={formatDate(data)} disabled />
-                          {form.valorAluguel && <p className="text-[11px] text-muted-foreground">{brl(Number(form.valorAluguel))}</p>}
-                        </div>
-                      ))}
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs">Dia de vencimento</Label>
+                      <Input value={form.diaVencimentoAluguel} onChange={(e) => setForm({ ...form, diaVencimentoAluguel: e.target.value })} type="number" min="1" max="31" />
                     </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-3">
                     {editingId === null && (
                       <div className="grid gap-1.5">
-                        <Label>Valor do aluguel (R$)</Label>
+                        <Label className="text-xs">Valor do aluguel (R$)</Label>
                         <Input value={form.valorAluguel} onChange={(e) => setForm({ ...form, valorAluguel: e.target.value })} type="number" step="0.01" />
                       </div>
                     )}
-                    <div className={editingId === null ? "grid gap-1.5" : "grid gap-1.5 col-span-2"}>
-                      <Label>Dia de vencimento</Label>
-                      <Input value={form.diaVencimentoAluguel} onChange={(e) => setForm({ ...form, diaVencimentoAluguel: e.target.value })} type="number" min="1" max="31" />
-                    </div>
                   </div>
                   {editingId !== null && (
                     <p className="text-xs text-muted-foreground -mt-2">
                       Para alterar o valor do aluguel, gerencie as parcelas em "Aluguéis a Receber".
                     </p>
+                  )}
+                  {numReajustes > 0 && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {datasReajusteCalculadas.map((data, i) => (
+                        <div key={data} className="grid grid-cols-2 gap-2 items-end">
+                          <div className="grid gap-1.5">
+                            <Label className="text-xs">{numReajustes > 1 ? `${i + 1}º reajuste` : "Reajuste"}</Label>
+                            <Input value={formatDate(data)} disabled />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label className="text-xs text-muted-foreground">Valor</Label>
+                            <Input value={form.valorAluguel ? brl(Number(form.valorAluguel)) : ""} disabled placeholder="—" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                   <div className="grid gap-1.5">
                     <div className="flex items-center justify-between">
