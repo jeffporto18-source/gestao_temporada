@@ -164,6 +164,8 @@ export default function Contratos() {
   // e os anexos visíveis juntos, já que o id já existe desde o início).
   const [editingId, setEditingId] = useState<number | null>(null);
   const [savedDocs, setSavedDocs] = useState<{ contratoLocacaoUrl?: string; garantiaDocumentoUrl?: string; apoliceSeguroUrl?: string; renovacaoContratoUrl?: string }>({});
+  // Toggle de "sem carência": quando marcado, esvazia e esconde os campos de data de carência.
+  const [semCarencia, setSemCarencia] = useState(false);
   const [uploadingLocacao, setUploadingLocacao] = useState(false);
   const [uploadingGarantia, setUploadingGarantia] = useState(false);
   const [uploadingApolice, setUploadingApolice] = useState(false);
@@ -197,7 +199,7 @@ export default function Contratos() {
   const { data: garantias } = trpc.guaranteeTypes.list.useQuery();
   const { data: imobiliarias } = trpc.imobiliarias.list.useQuery();
 
-  const reset = () => { setForm(emptyForm); setSavedContractId(null); setSavedDocs({}); setEditingId(null); };
+  const reset = () => { setForm(emptyForm); setSavedContractId(null); setSavedDocs({}); setEditingId(null); setSemCarencia(false); };
 
   const create = trpc.longTermContracts.create.useMutation({
     onSuccess: (res) => {
@@ -314,6 +316,7 @@ export default function Contratos() {
   const openEdit = (c: NonNullable<typeof contratos>[number]) => {
     setSavedContractId(null);
     setEditingId(c.id);
+    setSemCarencia(!c.carenciaInicio && !c.carenciaFim);
     setForm({
       propertyId: String(c.propertyId),
       dataInicio: c.dataInicio,
@@ -426,7 +429,7 @@ export default function Contratos() {
               >
                 <Plus className="mr-1 h-3.5 w-3.5" /> Novo contrato
               </Button>
-              <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+              <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle className="font-serif">
                     {savedContractId ? "Anexar documentos" : editingId !== null ? "Editar contrato" : "Novo contrato"}
@@ -472,7 +475,8 @@ export default function Contratos() {
                     </div>
                   </div>
                 ) : (
-                <div className="grid gap-4 py-2">
+                <div className="grid gap-4 py-2 md:grid-cols-2 md:gap-x-6 md:items-start">
+                  <div className="grid gap-4">
                   <div className="grid gap-1.5">
                     <Label>Imóvel</Label>
                     {editingId !== null || imovelTravado ? (
@@ -586,7 +590,9 @@ export default function Contratos() {
                       <Input value={form.emailInquilino} onChange={(e) => setForm({ ...form, emailInquilino: e.target.value })} type="email" />
                     </div>
                   </div>
+                  </div>
 
+                  <div className="grid gap-4">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="grid gap-1.5">
                       <Label>Início do contrato</Label>
@@ -596,6 +602,35 @@ export default function Contratos() {
                       <Label>Prazo (meses)</Label>
                       <Input value={form.prazoMeses} onChange={(e) => setForm({ ...form, prazoMeses: e.target.value })} type="number" min="1" />
                     </div>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label>Carência</Label>
+                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          className="h-3.5 w-3.5 rounded border-input"
+                          checked={semCarencia}
+                          onChange={(e) => {
+                            setSemCarencia(e.target.checked);
+                            if (e.target.checked) setForm((f) => ({ ...f, carenciaInicio: "", carenciaFim: "" }));
+                          }}
+                        />
+                        Sem carência
+                      </label>
+                    </div>
+                    {!semCarencia && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">Início</Label>
+                          <DateInput value={form.carenciaInicio} onChange={(v) => setForm({ ...form, carenciaInicio: v })} />
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">Fim</Label>
+                          <DateInput value={form.carenciaFim} onChange={(v) => setForm({ ...form, carenciaFim: v })} />
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="grid gap-1.5">
@@ -617,16 +652,6 @@ export default function Contratos() {
                       ))}
                     </div>
                   )}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="grid gap-1.5">
-                      <Label>Carência (início)</Label>
-                      <DateInput value={form.carenciaInicio} onChange={(v) => setForm({ ...form, carenciaInicio: v })} />
-                    </div>
-                    <div className="grid gap-1.5">
-                      <Label>Carência (fim)</Label>
-                      <DateInput value={form.carenciaFim} onChange={(v) => setForm({ ...form, carenciaFim: v })} />
-                    </div>
-                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     {editingId === null && (
                       <div className="grid gap-1.5">
@@ -668,7 +693,9 @@ export default function Contratos() {
                       </Select>
                     </div>
                   </div>
+                  </div>
 
+                  <div className="md:col-span-2 grid gap-4">
                   <div className="rounded-md border p-3">
                     <p className="text-sm font-medium">Condomínio e IPTU</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
@@ -702,18 +729,23 @@ export default function Contratos() {
                   </div>
 
                   <div className="grid gap-1.5">
-                    <Label>Renovação</Label>
-                    <Select
-                      value={form.renovacaoAutomatica}
-                      onValueChange={(v) => setForm({ ...form, renovacaoAutomatica: v as ContractForm["renovacaoAutomatica"] })}
-                    >
-                      <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                      <SelectContent>
-                        {(Object.keys(RENOVACAO_LABELS) as Exclude<ContractForm["renovacaoAutomatica"], "">[]).map((k) => (
-                          <SelectItem key={k} value={k}>{RENOVACAO_LABELS[k]}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label>Cadastrar Renovação</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {(Object.keys(RENOVACAO_LABELS) as Exclude<ContractForm["renovacaoAutomatica"], "">[]).map((k) => (
+                        <button
+                          key={k}
+                          type="button"
+                          onClick={() => setForm({ ...form, renovacaoAutomatica: form.renovacaoAutomatica === k ? "" : k })}
+                          className={`rounded-md border px-3 py-2 text-sm text-left transition-colors ${
+                            form.renovacaoAutomatica === k
+                              ? "border-primary bg-primary/10 text-primary font-medium"
+                              : "border-input bg-background hover:bg-secondary/50 text-muted-foreground"
+                          }`}
+                        >
+                          {RENOVACAO_LABELS[k]}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   {form.renovacaoAutomatica === "novo_contrato" && (
@@ -792,6 +824,7 @@ export default function Contratos() {
                       />
                     </div>
                   )}
+                  </div>
                 </div>
                 )}
                 <DialogFooter>
