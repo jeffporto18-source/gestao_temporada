@@ -2312,7 +2312,8 @@ export const appRouter = router({
 
         const eventosContrato: { propertyId: number; imovel: string; tipo: "reajuste" | "fim"; data: string }[] = [];
         for (const c of contratosLonga) {
-          const numReajustes = Math.floor(c.prazoMeses / 12);
+          // Não conta o reajuste que cai em cima do fim do contrato (ex.: contrato de 12 meses não tem reajuste).
+          const numReajustes = Math.max(0, Math.ceil(c.prazoMeses / 12) - 1);
           for (let i = 1; i <= numReajustes; i++) {
             const dataReajusteN = addMonthsToDate(c.dataInicio, 12 * i);
             if (dataReajusteN >= limiteAtrasoStr) {

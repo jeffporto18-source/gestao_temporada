@@ -247,9 +247,11 @@ export default function Contratos() {
 
   const prazoMesesNum = Number(form.prazoMeses) || 12;
   const dataFimCalculada = form.dataInicio ? addMonthsToDate(form.dataInicio, prazoMesesNum) : "";
-  // Reajuste ocorre a cada 12 meses; contratos mais longos têm mais de uma data (ex.: 30 meses → reajuste aos 12 e aos 24 meses).
+  // Reajuste ocorre a cada 12 meses, mas não conta o reajuste que cai em cima do fim do contrato
+  // (ex.: 12 meses → nenhum; 24 meses → 1, aos 12; 30 meses → 2, aos 12 e aos 24).
+  const numReajustes = Math.max(0, Math.ceil(prazoMesesNum / 12) - 1);
   const datasReajusteCalculadas = form.dataInicio
-    ? Array.from({ length: Math.floor(prazoMesesNum / 12) }, (_, i) => addMonthsToDate(form.dataInicio, 12 * (i + 1)))
+    ? Array.from({ length: numReajustes }, (_, i) => addMonthsToDate(form.dataInicio, 12 * (i + 1)))
     : [];
 
   const renovacaoNovoContratoPrazoNum = Number(form.renovacaoNovoContratoPrazoMeses) || 12;
@@ -573,7 +575,7 @@ export default function Contratos() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-3">
+                  <div className={numReajustes > 0 ? "grid grid-cols-4 gap-3" : "grid grid-cols-3 gap-3"}>
                     <div className="grid gap-1.5">
                       <Label>Início do contrato</Label>
                       <DateInput value={form.dataInicio} onChange={(v) => setForm({ ...form, dataInicio: v })} />
@@ -586,11 +588,42 @@ export default function Contratos() {
                       <Label>Fim do contrato</Label>
                       <Input value={form.dataInicio ? formatDate(dataFimCalculada) : ""} disabled placeholder="Calculado" />
                     </div>
-                    <div className="grid gap-1.5">
-                      <Label>{datasReajusteCalculadas.length > 1 ? "1º reajuste" : "Próx. reajuste"}</Label>
-                      <Input value={datasReajusteCalculadas[0] ? formatDate(datasReajusteCalculadas[0]) : ""} disabled placeholder="Calculado" />
+                    {numReajustes > 0 && (
+                      <div className="grid gap-1.5">
+                        <Label>{numReajustes > 1 ? "1º reajuste" : "Reajuste"}</Label>
+                        <Input value={datasReajusteCalculadas[0] ? formatDate(datasReajusteCalculadas[0]) : ""} disabled placeholder="Calculado" />
+                        {form.valorAluguel && <p className="text-[11px] text-muted-foreground">{brl(Number(form.valorAluguel))}</p>}
+                      </div>
+                    )}
+                  </div>
+                  {datasReajusteCalculadas.length > 1 && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {datasReajusteCalculadas.slice(1).map((data, i) => (
+                        <div key={data} className="grid gap-1.5">
+                          <Label>{`${i + 2}º reajuste`}</Label>
+                          <Input value={formatDate(data)} disabled />
+                          {form.valorAluguel && <p className="text-[11px] text-muted-foreground">{brl(Number(form.valorAluguel))}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-3">
+                    {editingId === null && (
+                      <div className="grid gap-1.5">
+                        <Label>Valor do aluguel (R$)</Label>
+                        <Input value={form.valorAluguel} onChange={(e) => setForm({ ...form, valorAluguel: e.target.value })} type="number" step="0.01" />
+                      </div>
+                    )}
+                    <div className={editingId === null ? "grid gap-1.5" : "grid gap-1.5 col-span-2"}>
+                      <Label>Dia de vencimento</Label>
+                      <Input value={form.diaVencimentoAluguel} onChange={(e) => setForm({ ...form, diaVencimentoAluguel: e.target.value })} type="number" min="1" max="31" />
                     </div>
                   </div>
+                  {editingId !== null && (
+                    <p className="text-xs text-muted-foreground -mt-2">
+                      Para alterar o valor do aluguel, gerencie as parcelas em "Aluguéis a Receber".
+                    </p>
+                  )}
                   <div className="grid gap-1.5">
                     <div className="flex items-center justify-between">
                       <Label>Carência</Label>
@@ -620,33 +653,6 @@ export default function Contratos() {
                       </div>
                     )}
                   </div>
-                  {datasReajusteCalculadas.length > 1 && (
-                    <div className="grid grid-cols-2 gap-3">
-                      {datasReajusteCalculadas.slice(1).map((data, i) => (
-                        <div key={data} className="grid gap-1.5">
-                          <Label>{`${i + 2}º reajuste`}</Label>
-                          <Input value={formatDate(data)} disabled />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-3">
-                    {editingId === null && (
-                      <div className="grid gap-1.5">
-                        <Label>Valor do aluguel (R$)</Label>
-                        <Input value={form.valorAluguel} onChange={(e) => setForm({ ...form, valorAluguel: e.target.value })} type="number" step="0.01" />
-                      </div>
-                    )}
-                    <div className={editingId === null ? "grid gap-1.5" : "grid gap-1.5 col-span-2"}>
-                      <Label>Dia de vencimento</Label>
-                      <Input value={form.diaVencimentoAluguel} onChange={(e) => setForm({ ...form, diaVencimentoAluguel: e.target.value })} type="number" min="1" max="31" />
-                    </div>
-                  </div>
-                  {editingId !== null && (
-                    <p className="text-xs text-muted-foreground -mt-2">
-                      Para alterar o valor do aluguel, gerencie as parcelas em "Aluguéis a Receber".
-                    </p>
-                  )}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="grid gap-1.5">
                       <Label>Índice de correção</Label>
