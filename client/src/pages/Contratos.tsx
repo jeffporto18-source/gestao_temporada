@@ -100,6 +100,7 @@ function DocumentoUploadRow({
   accept,
   onUpload,
   allowReplace = true,
+  disabled = false,
 }: {
   label: string;
   url?: string | null;
@@ -108,6 +109,8 @@ function DocumentoUploadRow({
   onUpload: (file: File) => void;
   /** Quando false, some com o botão de anexar/substituir assim que houver um arquivo (só o "Ver" fica visível). */
   allowReplace?: boolean;
+  /** Quando true, mostra a linha mas trava o botão de anexar — usado antes de o contrato ter sido salvo (sem id ainda). */
+  disabled?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
@@ -129,7 +132,7 @@ function DocumentoUploadRow({
           size="sm"
           variant="outline"
           className="h-7 text-xs text-muted-foreground hover:text-primary"
-          disabled={uploading}
+          disabled={uploading || disabled}
           onClick={() => inputRef.current?.click()}
         >
           {uploading ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Upload className="mr-1 h-3.5 w-3.5" />}
@@ -157,11 +160,9 @@ export default function Contratos() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<ContractForm>(emptyForm);
   const [selectedContractId, setSelectedContractId] = useState<number | null>(null);
-  // Contrato recém-criado nesta sessão do diálogo: enquanto definido, o diálogo fica aberto
-  // mostrando os 3 anexos em vez do formulário (o upload só é possível com o id já existente).
-  const [savedContractId, setSavedContractId] = useState<number | null>(null);
-  // Contrato existente sendo editado (abre o mesmo diálogo pré-preenchido, com o formulário
-  // e os anexos visíveis juntos, já que o id já existe desde o início).
+  // Contrato sendo editado no diálogo — formulário e anexos ficam juntos na mesma tela. Ao criar
+  // um contrato novo, o id retornado é atribuído aqui também, então o diálogo não troca de tela:
+  // continua no mesmo formulário, os anexos liberam na hora e "Salvar" passa a atualizar.
   const [editingId, setEditingId] = useState<number | null>(null);
   const [savedDocs, setSavedDocs] = useState<{ contratoLocacaoUrl?: string; garantiaDocumentoUrl?: string; apoliceSeguroUrl?: string; renovacaoContratoUrl?: string }>({});
   // Toggle de "sem carência": quando marcado, esvazia e esconde os campos de data de carência.
@@ -199,21 +200,23 @@ export default function Contratos() {
   const { data: garantias } = trpc.guaranteeTypes.list.useQuery();
   const { data: imobiliarias } = trpc.imobiliarias.list.useQuery();
 
-  const reset = () => { setForm(emptyForm); setSavedContractId(null); setSavedDocs({}); setEditingId(null); setSemCarencia(false); };
+  const reset = () => { setForm(emptyForm); setSavedDocs({}); setEditingId(null); setSemCarencia(false); };
 
   const create = trpc.longTermContracts.create.useMutation({
     onSuccess: (res) => {
       utils.longTermContracts.list.invalidate();
       utils.properties.list.invalidate(); // o anexo antigo do imóvel pode ter sido migrado para cá
-      setSavedContractId(res.id);
       setSelectedContractId(res.id);
+      // Continua na mesma tela em vez de trocar para uma etapa separada: passa a tratar como edição
+      // deste contrato recém-criado, então os anexos liberam na hora e o botão Salvar passa a atualizar.
+      setEditingId(res.id);
       // Se o imóvel já tinha um contrato de locação anexado antes de existir esta aba, ele acabou
       // de ser herdado pelo contrato — mostra como já anexado em vez de pedir para anexar de novo.
       if (res.contratoLocacaoUrl) {
         setSavedDocs((prev) => ({ ...prev, contratoLocacaoUrl: res.contratoLocacaoUrl ?? undefined }));
         toast.success("Contrato cadastrado. O documento já anexado no imóvel foi vinculado a ele.");
       } else {
-        toast.success("Contrato cadastrado. Anexe os documentos abaixo.");
+        toast.success("Contrato cadastrado. Você já pode anexar os documentos abaixo.");
       }
     },
     onError: (e) => toast.error(e.message),
@@ -314,7 +317,6 @@ export default function Contratos() {
   const selectedContract = contratos?.find((c) => c.id === selectedContractId);
 
   const openEdit = (c: NonNullable<typeof contratos>[number]) => {
-    setSavedContractId(null);
     setEditingId(c.id);
     setSemCarencia(!c.carenciaInicio && !c.carenciaFim);
     setForm({
@@ -429,52 +431,12 @@ export default function Contratos() {
               >
                 <Plus className="mr-1 h-3.5 w-3.5" /> Novo contrato
               </Button>
-              <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
+              <DialogContent className="sm:max-w-5xl max-h-[92vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle className="font-serif">
-                    {savedContractId ? "Anexar documentos" : editingId !== null ? "Editar contrato" : "Novo contrato"}
+                    {editingId !== null ? "Editar contrato" : "Novo contrato"}
                   </DialogTitle>
                 </DialogHeader>
-                {savedContractId ? (
-                  <div className="grid gap-3 py-2">
-                    <p className="text-sm text-muted-foreground">
-                      Contrato cadastrado. Anexe os documentos abaixo (opcional — pode fazer isso depois também).
-                    </p>
-                    <div className="rounded-lg border border-border bg-secondary/50 p-3 space-y-3">
-                      <DocumentoUploadRow
-                        label="Contrato - 1ª Locação"
-                        url={savedDocs.contratoLocacaoUrl}
-                        uploading={uploadingLocacao}
-                        accept="application/pdf,image/jpeg,image/png,image/webp"
-                        allowReplace={false}
-                        onUpload={(file) => handleContratoLocacaoUpload(savedContractId, file)}
-                      />
-                      <DocumentoUploadRow
-                        label="Documentos da fiança"
-                        url={savedDocs.garantiaDocumentoUrl}
-                        uploading={uploadingGarantia}
-                        accept="application/pdf,image/jpeg,image/png,image/webp"
-                        onUpload={(file) => handleGarantiaDocUpload(savedContractId, file)}
-                      />
-                      <DocumentoUploadRow
-                        label="Apólice de seguro"
-                        url={savedDocs.apoliceSeguroUrl}
-                        uploading={uploadingApolice}
-                        accept="application/pdf,image/jpeg,image/png,image/webp"
-                        onUpload={(file) => handleApoliceSeguroUpload(savedContractId, file)}
-                      />
-                      {form.renovacaoAutomatica === "novo_contrato" && (
-                        <DocumentoUploadRow
-                          label="Contrato renovado"
-                          url={savedDocs.renovacaoContratoUrl}
-                          uploading={uploadingRenovacao}
-                          accept="application/pdf,image/jpeg,image/png,image/webp"
-                          onUpload={(file) => handleRenovacaoContratoUpload(savedContractId, file)}
-                        />
-                      )}
-                    </div>
-                  </div>
-                ) : (
                 <div className="grid gap-4 py-2">
                   <div className="grid gap-1.5">
                     <Label>Imóvel</Label>
@@ -743,17 +705,17 @@ export default function Contratos() {
 
                   {form.renovacaoAutomatica === "novo_contrato" && (
                     <div className="rounded-lg border border-border bg-secondary/50 p-3">
-                      {editingId !== null ? (
-                        <DocumentoUploadRow
-                          label="Contrato renovado"
-                          url={savedDocs.renovacaoContratoUrl}
-                          uploading={uploadingRenovacao}
-                          accept="application/pdf,image/jpeg,image/png,image/webp"
-                          onUpload={(file) => handleRenovacaoContratoUpload(editingId, file)}
-                        />
-                      ) : (
-                        <p className="text-xs text-muted-foreground">Você poderá anexar o novo contrato assinado depois de salvar.</p>
+                      {editingId === null && (
+                        <p className="mb-2 text-xs text-muted-foreground">Salve o contrato para habilitar o anexo.</p>
                       )}
+                      <DocumentoUploadRow
+                        label="Contrato renovado"
+                        url={savedDocs.renovacaoContratoUrl}
+                        uploading={uploadingRenovacao}
+                        accept="application/pdf,image/jpeg,image/png,image/webp"
+                        disabled={editingId === null}
+                        onUpload={(file) => editingId !== null && handleRenovacaoContratoUpload(editingId, file)}
+                      />
                     </div>
                   )}
 
@@ -790,46 +752,45 @@ export default function Contratos() {
                     </div>
                   )}
 
-                  {editingId !== null && (
-                    <div className="rounded-lg border border-border bg-secondary/50 p-3 space-y-3">
-                      <p className="text-xs font-medium text-muted-foreground">Documentos do contrato</p>
-                      <DocumentoUploadRow
-                        label="Contrato - 1ª Locação"
-                        url={savedDocs.contratoLocacaoUrl}
-                        uploading={uploadingLocacao}
-                        accept="application/pdf,image/jpeg,image/png,image/webp"
-                        allowReplace={false}
-                        onUpload={(file) => handleContratoLocacaoUpload(editingId, file)}
-                      />
-                      <DocumentoUploadRow
-                        label="Documentos da fiança"
-                        url={savedDocs.garantiaDocumentoUrl}
-                        uploading={uploadingGarantia}
-                        accept="application/pdf,image/jpeg,image/png,image/webp"
-                        onUpload={(file) => handleGarantiaDocUpload(editingId, file)}
-                      />
-                      <DocumentoUploadRow
-                        label="Apólice de seguro"
-                        url={savedDocs.apoliceSeguroUrl}
-                        uploading={uploadingApolice}
-                        accept="application/pdf,image/jpeg,image/png,image/webp"
-                        onUpload={(file) => handleApoliceSeguroUpload(editingId, file)}
-                      />
-                    </div>
-                  )}
+                  <div className="rounded-lg border border-border bg-secondary/50 p-3 space-y-3">
+                    <p className="text-xs font-medium text-muted-foreground">Documentos do contrato</p>
+                    {editingId === null && (
+                      <p className="text-xs text-muted-foreground">Salve o contrato para habilitar os anexos.</p>
+                    )}
+                    <DocumentoUploadRow
+                      label="Contrato - 1ª Locação"
+                      url={savedDocs.contratoLocacaoUrl}
+                      uploading={uploadingLocacao}
+                      accept="application/pdf,image/jpeg,image/png,image/webp"
+                      allowReplace={false}
+                      disabled={editingId === null}
+                      onUpload={(file) => editingId !== null && handleContratoLocacaoUpload(editingId, file)}
+                    />
+                    <DocumentoUploadRow
+                      label="Documentos da fiança"
+                      url={savedDocs.garantiaDocumentoUrl}
+                      uploading={uploadingGarantia}
+                      accept="application/pdf,image/jpeg,image/png,image/webp"
+                      disabled={editingId === null}
+                      onUpload={(file) => editingId !== null && handleGarantiaDocUpload(editingId, file)}
+                    />
+                    <DocumentoUploadRow
+                      label="Apólice de seguro"
+                      url={savedDocs.apoliceSeguroUrl}
+                      uploading={uploadingApolice}
+                      accept="application/pdf,image/jpeg,image/png,image/webp"
+                      disabled={editingId === null}
+                      onUpload={(file) => editingId !== null && handleApoliceSeguroUpload(editingId, file)}
+                    />
+                  </div>
                 </div>
-                )}
                 <DialogFooter>
-                  {savedContractId ? (
-                    <Button onClick={() => setOpen(false)}>Concluir</Button>
-                  ) : (
-                    <>
-                      <Button variant="outline" className="bg-background" onClick={() => setOpen(false)}>Cancelar</Button>
-                      <Button onClick={submit} disabled={create.isPending || update.isPending}>
-                        {editingId !== null ? "Salvar alterações" : "Salvar"}
-                      </Button>
-                    </>
-                  )}
+                  <Button variant="outline" className="bg-background" onClick={() => setOpen(false)}>
+                    {editingId !== null ? "Concluir" : "Cancelar"}
+                  </Button>
+                  <Button onClick={submit} disabled={create.isPending || update.isPending}>
+                    {editingId !== null ? "Salvar alterações" : "Salvar"}
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
