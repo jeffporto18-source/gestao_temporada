@@ -288,6 +288,13 @@
       "when": 1786830541121,
       "tag": "0040_add_socio_grupos",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "5",
+      "when": 1786830601121,
+      "tag": "0041_add_renovacao_novo_contrato",
+      "breakpoints": true
     }
   ]
 }

@@ -49,6 +49,8 @@ interface ContractForm {
   prazoIndeterminadoDataInicio: string;
   prazoIndeterminadoValor: string;
   prazoIndeterminadoPrazoReajusteMeses: string;
+  renovacaoNovoContratoDataInicio: string;
+  renovacaoNovoContratoPrazoMeses: string;
   condominioPor: CostResponsibility;
   iptuPor: CostResponsibility;
 }
@@ -67,6 +69,7 @@ const emptyForm: ContractForm = {
   nomeInquilino: "", cpfCnpjInquilino: "", contatoInquilino: "", telefoneInquilino: "", celularInquilino: "",
   whatsappInquilino: "", emailInquilino: "", tipoGarantia: "", comissaoPct: "0", tipoAdministracao: "propria", imobiliariaId: "",
   renovacaoAutomatica: "", prazoIndeterminadoDataInicio: "", prazoIndeterminadoValor: "", prazoIndeterminadoPrazoReajusteMeses: "",
+  renovacaoNovoContratoDataInicio: "", renovacaoNovoContratoPrazoMeses: "12",
   condominioPor: "proprietario", iptuPor: "proprietario",
 };
 
@@ -248,6 +251,14 @@ export default function Contratos() {
     ? Array.from({ length: Math.floor(prazoMesesNum / 12) }, (_, i) => addMonthsToDate(form.dataInicio, 12 * (i + 1)))
     : [];
 
+  const renovacaoNovoContratoPrazoNum = Number(form.renovacaoNovoContratoPrazoMeses) || 12;
+  const renovacaoNovoContratoDataFimCalculada = form.renovacaoNovoContratoDataInicio
+    ? addMonthsToDate(form.renovacaoNovoContratoDataInicio, renovacaoNovoContratoPrazoNum)
+    : "";
+  const renovacaoNovoContratoDataReajusteCalculada = form.renovacaoNovoContratoDataInicio
+    ? addMonthsToDate(form.renovacaoNovoContratoDataInicio, 12)
+    : "";
+
   const submit = () => {
     if (!form.dataInicio) { toast.error("Informe a data de início do contrato."); return; }
 
@@ -275,6 +286,8 @@ export default function Contratos() {
         prazoIndeterminadoDataInicio: form.renovacaoAutomatica === "prazo_indeterminado" ? (form.prazoIndeterminadoDataInicio || null) : null,
         prazoIndeterminadoValor: form.renovacaoAutomatica === "prazo_indeterminado" && form.prazoIndeterminadoValor ? Number(form.prazoIndeterminadoValor) : null,
         prazoIndeterminadoPrazoReajusteMeses: form.renovacaoAutomatica === "prazo_indeterminado" && form.prazoIndeterminadoPrazoReajusteMeses ? Number(form.prazoIndeterminadoPrazoReajusteMeses) : null,
+        renovacaoNovoContratoDataInicio: form.renovacaoAutomatica === "novo_contrato" ? (form.renovacaoNovoContratoDataInicio || null) : null,
+        renovacaoNovoContratoPrazoMeses: form.renovacaoAutomatica === "novo_contrato" && form.renovacaoNovoContratoPrazoMeses ? Number(form.renovacaoNovoContratoPrazoMeses) : null,
         condominioPor: form.condominioPor,
         iptuPor: form.iptuPor,
       });
@@ -308,6 +321,8 @@ export default function Contratos() {
       prazoIndeterminadoDataInicio: form.renovacaoAutomatica === "prazo_indeterminado" ? (form.prazoIndeterminadoDataInicio || undefined) : undefined,
       prazoIndeterminadoValor: form.renovacaoAutomatica === "prazo_indeterminado" && form.prazoIndeterminadoValor ? Number(form.prazoIndeterminadoValor) : undefined,
       prazoIndeterminadoPrazoReajusteMeses: form.renovacaoAutomatica === "prazo_indeterminado" && form.prazoIndeterminadoPrazoReajusteMeses ? Number(form.prazoIndeterminadoPrazoReajusteMeses) : undefined,
+      renovacaoNovoContratoDataInicio: form.renovacaoAutomatica === "novo_contrato" ? (form.renovacaoNovoContratoDataInicio || undefined) : undefined,
+      renovacaoNovoContratoPrazoMeses: form.renovacaoAutomatica === "novo_contrato" && form.renovacaoNovoContratoPrazoMeses ? Number(form.renovacaoNovoContratoPrazoMeses) : undefined,
       condominioPor: form.condominioPor,
       iptuPor: form.iptuPor,
     });
@@ -343,6 +358,8 @@ export default function Contratos() {
       prazoIndeterminadoDataInicio: c.prazoIndeterminadoDataInicio || "",
       prazoIndeterminadoValor: c.prazoIndeterminadoValor ? String(c.prazoIndeterminadoValor) : "",
       prazoIndeterminadoPrazoReajusteMeses: c.prazoIndeterminadoPrazoReajusteMeses ? String(c.prazoIndeterminadoPrazoReajusteMeses) : "",
+      renovacaoNovoContratoDataInicio: c.renovacaoNovoContratoDataInicio || "",
+      renovacaoNovoContratoPrazoMeses: c.renovacaoNovoContratoPrazoMeses ? String(c.renovacaoNovoContratoPrazoMeses) : "12",
       condominioPor: (c.condominioPor as CostResponsibility) || "proprietario",
       iptuPor: (c.iptuPor as CostResponsibility) || "proprietario",
     });
@@ -704,9 +721,38 @@ export default function Contratos() {
                   </div>
 
                   {form.renovacaoAutomatica === "novo_contrato" && (
-                    <div className="rounded-lg border border-border bg-secondary/50 p-3">
+                    <div className="rounded-lg border border-border bg-secondary/50 p-3 space-y-3">
+                      <p className="text-xs font-medium text-muted-foreground">Novo contrato</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">Início</Label>
+                          <DateInput
+                            value={form.renovacaoNovoContratoDataInicio}
+                            onChange={(v) => setForm({ ...form, renovacaoNovoContratoDataInicio: v })}
+                          />
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">Prazo (meses)</Label>
+                          <Input
+                            value={form.renovacaoNovoContratoPrazoMeses}
+                            onChange={(e) => setForm({ ...form, renovacaoNovoContratoPrazoMeses: e.target.value })}
+                            type="number"
+                            min="1"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">Fim</Label>
+                          <Input value={renovacaoNovoContratoDataFimCalculada ? formatDate(renovacaoNovoContratoDataFimCalculada) : ""} disabled placeholder="Calculado" />
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">Reajuste</Label>
+                          <Input value={renovacaoNovoContratoDataReajusteCalculada ? formatDate(renovacaoNovoContratoDataReajusteCalculada) : ""} disabled placeholder="Calculado" />
+                        </div>
+                      </div>
                       {editingId === null && (
-                        <p className="mb-2 text-xs text-muted-foreground">Salve o contrato para habilitar o anexo.</p>
+                        <p className="text-xs text-muted-foreground">Salve o contrato para habilitar o anexo.</p>
                       )}
                       <DocumentoUploadRow
                         label="Contrato renovado"

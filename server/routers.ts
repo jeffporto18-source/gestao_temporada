@@ -1152,6 +1152,8 @@ export const appRouter = router({
           prazoIndeterminadoDataInicio: z.string().optional(),
           prazoIndeterminadoValor: z.number().positive().optional(),
           prazoIndeterminadoPrazoReajusteMeses: z.number().int().positive().optional(),
+          renovacaoNovoContratoDataInicio: z.string().optional(),
+          renovacaoNovoContratoPrazoMeses: z.number().int().positive().optional(),
           condominioPor: costResponsibilitySchema.default("proprietario"),
           iptuPor: costResponsibilitySchema.default("proprietario"),
         }),
@@ -1162,6 +1164,14 @@ export const appRouter = router({
         // Fim do contrato: início + prazo em meses. Reajuste: sempre a cada 12 meses a partir do início.
         const dataFim = addMonthsToDate(rest.dataInicio, rest.prazoMeses);
         const dataReajuste = addMonthsToDate(rest.dataInicio, 12);
+        // Vigência do novo contrato da renovação, calculada do mesmo jeito.
+        const renovacaoNovoContratoDataFim =
+          rest.renovacaoNovoContratoDataInicio && rest.renovacaoNovoContratoPrazoMeses
+            ? addMonthsToDate(rest.renovacaoNovoContratoDataInicio, rest.renovacaoNovoContratoPrazoMeses)
+            : null;
+        const renovacaoNovoContratoDataReajuste = rest.renovacaoNovoContratoDataInicio
+          ? addMonthsToDate(rest.renovacaoNovoContratoDataInicio, 12)
+          : null;
 
         const contractId = await db.createLongTermContract({
           ownerId: ctx.ownerId,
@@ -1189,6 +1199,10 @@ export const appRouter = router({
           prazoIndeterminadoDataInicio: rest.prazoIndeterminadoDataInicio || null,
           prazoIndeterminadoValor: rest.prazoIndeterminadoValor !== undefined ? String(rest.prazoIndeterminadoValor) : null,
           prazoIndeterminadoPrazoReajusteMeses: rest.prazoIndeterminadoPrazoReajusteMeses ?? null,
+          renovacaoNovoContratoDataInicio: rest.renovacaoNovoContratoDataInicio || null,
+          renovacaoNovoContratoPrazoMeses: rest.renovacaoNovoContratoPrazoMeses ?? null,
+          renovacaoNovoContratoDataFim,
+          renovacaoNovoContratoDataReajuste,
           condominioPor: rest.condominioPor,
           iptuPor: rest.iptuPor,
         });
@@ -1280,13 +1294,22 @@ export const appRouter = router({
           prazoIndeterminadoDataInicio: z.string().nullable().optional(),
           prazoIndeterminadoValor: z.number().positive().nullable().optional(),
           prazoIndeterminadoPrazoReajusteMeses: z.number().int().positive().nullable().optional(),
+          renovacaoNovoContratoDataInicio: z.string().nullable().optional(),
+          renovacaoNovoContratoPrazoMeses: z.number().int().positive().nullable().optional(),
           condominioPor: costResponsibilitySchema.optional(),
           iptuPor: costResponsibilitySchema.optional(),
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        const { id, dataInicio, dataFim, dataReajuste, carenciaInicio, carenciaFim, comissaoPct, prazoIndeterminadoValor, imobiliariaId, ...rest } = input;
+        const {
+          id, dataInicio, dataFim, dataReajuste, carenciaInicio, carenciaFim, comissaoPct, prazoIndeterminadoValor, imobiliariaId,
+          renovacaoNovoContratoDataInicio, renovacaoNovoContratoPrazoMeses, ...rest
+        } = input;
         const contrato = await db.getLongTermContract(ctx.ownerId, id);
+        // Recalcula fim/reajuste do novo contrato da renovação sempre que início ou prazo mudam,
+        // usando o que já estava salvo quando o campo não veio nesta chamada.
+        const novoContratoDataInicio = renovacaoNovoContratoDataInicio !== undefined ? renovacaoNovoContratoDataInicio : (contrato?.renovacaoNovoContratoDataInicio ?? null);
+        const novoContratoPrazoMeses = renovacaoNovoContratoPrazoMeses !== undefined ? renovacaoNovoContratoPrazoMeses : (contrato?.renovacaoNovoContratoPrazoMeses ?? null);
         await db.updateLongTermContract(ctx.ownerId, id, {
           ...rest,
           ...(comissaoPct !== undefined ? { comissaoPct: String(comissaoPct) } : {}),
@@ -1299,6 +1322,14 @@ export const appRouter = router({
           ...(dataReajuste !== undefined ? { dataReajuste } : {}),
           ...(carenciaInicio !== undefined ? { carenciaInicio } : {}),
           ...(carenciaFim !== undefined ? { carenciaFim } : {}),
+          ...((renovacaoNovoContratoDataInicio !== undefined || renovacaoNovoContratoPrazoMeses !== undefined)
+            ? {
+                renovacaoNovoContratoDataInicio: novoContratoDataInicio,
+                renovacaoNovoContratoPrazoMeses: novoContratoPrazoMeses,
+                renovacaoNovoContratoDataFim: novoContratoDataInicio && novoContratoPrazoMeses ? addMonthsToDate(novoContratoDataInicio, novoContratoPrazoMeses) : null,
+                renovacaoNovoContratoDataReajuste: novoContratoDataInicio ? addMonthsToDate(novoContratoDataInicio, 12) : null,
+              }
+            : {}),
         });
         // Vigência e responsabilidade podem ter mudado, e ambas alteram quem paga cada custo.
         if (contrato) await sincronizarCustosDoImovel(ctx.ownerId, contrato.propertyId);
