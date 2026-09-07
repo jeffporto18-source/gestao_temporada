@@ -34,11 +34,11 @@ import { NIVEL_ROTULO } from "./RequireEmpresa";
 const allMenuItems = [
   { icon: LayoutDashboard, label: "Painel", path: "/app", hideFor: [] as string[] },
   { icon: Users, label: "Clientes", path: "/clientes", hideFor: ["holding"] },
-  { icon: Building2, label: "Imóveis", path: "/imoveis", hideFor: [] as string[] },
+  { icon: Building2, label: "Cadastrar Imóveis", path: "/imoveis", hideFor: [] as string[] },
   { icon: Landmark, label: "Imobiliárias", path: "/imobiliarias", hideFor: [] as string[] },
   { icon: UserCog2, label: "Gestores de Temporada", path: "/gestores-temporada", hideFor: [] as string[] },
   { icon: CalendarDays, label: "Reservas de Curta Temporada", path: "/reservas", hideFor: [] as string[] },
-  { icon: FileSignature, label: "Contratos", path: "/contratos", hideFor: [] as string[] },
+  { icon: FileSignature, label: "Cadastrar Contratos", path: "/contratos", hideFor: [] as string[] },
   { icon: Wallet, label: "Aluguéis a Receber", path: "/alugueis-receber", hideFor: [] as string[] },
   { icon: TrendingUp, label: "Contas a Receber", path: "/receitas", hideFor: [] as string[] },
   { icon: Receipt, label: "Contas a Pagar", path: "/despesas", hideFor: [] as string[] },
