@@ -69,7 +69,7 @@ const emptyForm: ContractForm = {
   indiceCorrecao: "IGPM", carenciaInicio: "", carenciaFim: "", valorAluguel: "",
   nomeInquilino: "", cpfCnpjInquilino: "", contatoInquilino: "", telefoneInquilino: "", celularInquilino: "",
   whatsappInquilino: "", emailInquilino: "", tipoGarantia: "", comissaoPct: "0", tipoAdministracao: "propria", imobiliariaId: "",
-  renovacaoAutomatica: "", prazoIndeterminadoDataInicio: "", prazoIndeterminadoValor: "", prazoIndeterminadoPrazoReajusteMeses: "",
+  renovacaoAutomatica: "", prazoIndeterminadoDataInicio: "", prazoIndeterminadoValor: "", prazoIndeterminadoPrazoReajusteMeses: "12",
   renovacaoNovoContratoDataInicio: "", renovacaoNovoContratoPrazoMeses: "12", renovacaoNovoContratoValor: "",
   condominioPor: "proprietario", iptuPor: "proprietario",
 };
@@ -258,9 +258,11 @@ export default function Contratos() {
   const renovacaoNovoContratoDataFimCalculada = form.renovacaoNovoContratoDataInicio
     ? addMonthsToDate(form.renovacaoNovoContratoDataInicio, renovacaoNovoContratoPrazoNum)
     : "";
-  const renovacaoNovoContratoDataReajusteCalculada = form.renovacaoNovoContratoDataInicio
-    ? addMonthsToDate(form.renovacaoNovoContratoDataInicio, 12)
-    : "";
+  // Mesma regra do contrato principal: não conta o reajuste que cai em cima do fim do novo contrato.
+  const renovacaoNovoContratoNumReajustes = Math.max(0, Math.ceil(renovacaoNovoContratoPrazoNum / 12) - 1);
+  const renovacaoNovoContratoDatasReajuste = form.renovacaoNovoContratoDataInicio
+    ? Array.from({ length: renovacaoNovoContratoNumReajustes }, (_, i) => addMonthsToDate(form.renovacaoNovoContratoDataInicio, 12 * (i + 1)))
+    : [];
 
   const submit = () => {
     if (!form.dataInicio) { toast.error("Informe a data de início do contrato."); return; }
@@ -362,7 +364,7 @@ export default function Contratos() {
       renovacaoAutomatica: (c.renovacaoAutomatica as ContractForm["renovacaoAutomatica"]) || "",
       prazoIndeterminadoDataInicio: c.prazoIndeterminadoDataInicio || "",
       prazoIndeterminadoValor: c.prazoIndeterminadoValor ? String(c.prazoIndeterminadoValor) : "",
-      prazoIndeterminadoPrazoReajusteMeses: c.prazoIndeterminadoPrazoReajusteMeses ? String(c.prazoIndeterminadoPrazoReajusteMeses) : "",
+      prazoIndeterminadoPrazoReajusteMeses: c.prazoIndeterminadoPrazoReajusteMeses ? String(c.prazoIndeterminadoPrazoReajusteMeses) : "12",
       renovacaoNovoContratoDataInicio: c.renovacaoNovoContratoDataInicio || "",
       renovacaoNovoContratoPrazoMeses: c.renovacaoNovoContratoPrazoMeses ? String(c.renovacaoNovoContratoPrazoMeses) : "12",
       renovacaoNovoContratoValor: c.renovacaoNovoContratoValor ? String(c.renovacaoNovoContratoValor) : "",
@@ -729,7 +731,7 @@ export default function Contratos() {
                   {form.renovacaoAutomatica === "novo_contrato" && (
                     <div className="rounded-lg border border-border bg-secondary/50 p-3 space-y-3">
                       <p className="text-xs font-medium text-muted-foreground">Novo contrato</p>
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${4 + renovacaoNovoContratoNumReajustes}, minmax(0, 1fr))` }}>
                         <div className="grid gap-1.5">
                           <Label className="text-xs">Início</Label>
                           <DateInput
@@ -755,16 +757,16 @@ export default function Contratos() {
                             step="0.01"
                           />
                         </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
                         <div className="grid gap-1.5">
                           <Label className="text-xs">Fim</Label>
                           <Input value={renovacaoNovoContratoDataFimCalculada ? formatDate(renovacaoNovoContratoDataFimCalculada) : ""} disabled placeholder="Calculado" />
                         </div>
-                        <div className="grid gap-1.5">
-                          <Label className="text-xs">Reajuste</Label>
-                          <Input value={renovacaoNovoContratoDataReajusteCalculada ? formatDate(renovacaoNovoContratoDataReajusteCalculada) : ""} disabled placeholder="Calculado" />
-                        </div>
+                        {renovacaoNovoContratoDatasReajuste.map((data, i) => (
+                          <div key={data} className="grid gap-1.5">
+                            <Label className="text-xs">{renovacaoNovoContratoNumReajustes > 1 ? `${i + 1}º reajuste` : "Reajuste"}</Label>
+                            <Input value={formatDate(data)} disabled placeholder="Calculado" />
+                          </div>
+                        ))}
                       </div>
                       {editingId === null && (
                         <p className="text-xs text-muted-foreground">Salve o contrato para habilitar o anexo.</p>
