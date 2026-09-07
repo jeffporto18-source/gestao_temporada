@@ -475,8 +475,7 @@ export default function Contratos() {
                     </div>
                   </div>
                 ) : (
-                <div className="grid gap-4 py-2 md:grid-cols-2 md:gap-x-6 md:items-start">
-                  <div className="grid gap-4">
+                <div className="grid gap-4 py-2">
                   <div className="grid gap-1.5">
                     <Label>Imóvel</Label>
                     {editingId !== null || imovelTravado ? (
@@ -590,10 +589,8 @@ export default function Contratos() {
                       <Input value={form.emailInquilino} onChange={(e) => setForm({ ...form, emailInquilino: e.target.value })} type="email" />
                     </div>
                   </div>
-                  </div>
 
-                  <div className="grid gap-4">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-4 gap-3">
                     <div className="grid gap-1.5">
                       <Label>Início do contrato</Label>
                       <DateInput value={form.dataInicio} onChange={(v) => setForm({ ...form, dataInicio: v })} />
@@ -601,6 +598,14 @@ export default function Contratos() {
                     <div className="grid gap-1.5">
                       <Label>Prazo (meses)</Label>
                       <Input value={form.prazoMeses} onChange={(e) => setForm({ ...form, prazoMeses: e.target.value })} type="number" min="1" />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label>Fim do contrato</Label>
+                      <Input value={form.dataInicio ? formatDate(dataFimCalculada) : ""} disabled placeholder="Calculado" />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label>{datasReajusteCalculadas.length > 1 ? "1º reajuste" : "Próx. reajuste"}</Label>
+                      <Input value={datasReajusteCalculadas[0] ? formatDate(datasReajusteCalculadas[0]) : ""} disabled placeholder="Calculado" />
                     </div>
                   </div>
                   <div className="grid gap-1.5">
@@ -631,16 +636,6 @@ export default function Contratos() {
                         </div>
                       </div>
                     )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="grid gap-1.5">
-                      <Label>Fim do contrato</Label>
-                      <Input value={form.dataInicio ? formatDate(dataFimCalculada) : ""} disabled placeholder="Calculado a partir do início + prazo" />
-                    </div>
-                    <div className="grid gap-1.5">
-                      <Label>{datasReajusteCalculadas.length > 1 ? "1º reajuste" : "Próximo reajuste"}</Label>
-                      <Input value={datasReajusteCalculadas[0] ? formatDate(datasReajusteCalculadas[0]) : ""} disabled placeholder="Calculado (a cada 12 meses)" />
-                    </div>
                   </div>
                   {datasReajusteCalculadas.length > 1 && (
                     <div className="grid grid-cols-2 gap-3">
@@ -693,9 +688,7 @@ export default function Contratos() {
                       </Select>
                     </div>
                   </div>
-                  </div>
 
-                  <div className="md:col-span-2 grid gap-4">
                   <div className="rounded-md border p-3">
                     <p className="text-sm font-medium">Condomínio e IPTU</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
@@ -824,7 +817,6 @@ export default function Contratos() {
                       />
                     </div>
                   )}
-                  </div>
                 </div>
                 )}
                 <DialogFooter>
