@@ -506,6 +506,13 @@ export const longTermContracts = mysqlTable("long_term_contracts", {
   renovacaoGarantiaDocumentoKey: varchar("renovacaoGarantiaDocumentoKey", { length: 255 }),
   renovacaoApoliceSeguroUrl: varchar("renovacaoApoliceSeguroUrl", { length: 500 }),
   renovacaoApoliceSeguroKey: varchar("renovacaoApoliceSeguroKey", { length: 255 }),
+  // 2ª renovação (mesmo padrão da 1ª): documentos de um segundo ciclo de renovação do contrato.
+  renovacao2ContratoUrl: varchar("renovacao2ContratoUrl", { length: 500 }),
+  renovacao2ContratoKey: varchar("renovacao2ContratoKey", { length: 255 }),
+  renovacao2GarantiaDocumentoUrl: varchar("renovacao2GarantiaDocumentoUrl", { length: 500 }),
+  renovacao2GarantiaDocumentoKey: varchar("renovacao2GarantiaDocumentoKey", { length: 255 }),
+  renovacao2ApoliceSeguroUrl: varchar("renovacao2ApoliceSeguroUrl", { length: 500 }),
+  renovacao2ApoliceSeguroKey: varchar("renovacao2ApoliceSeguroKey", { length: 255 }),
   prazoIndeterminadoDataInicio: date("prazoIndeterminadoDataInicio", { mode: "string" }),
   prazoIndeterminadoValor: decimal("prazoIndeterminadoValor", { precision: 12, scale: 2 }),
   prazoIndeterminadoPrazoReajusteMeses: int("prazoIndeterminadoPrazoReajusteMeses"),

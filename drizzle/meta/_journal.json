@@ -309,6 +309,13 @@
       "when": 1786830721121,
       "tag": "0043_add_renovacao_garantia_apolice",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "5",
+      "when": 1786830781121,
+      "tag": "0044_add_renovacao2_documentos",
+      "breakpoints": true
     }
   ]
 }

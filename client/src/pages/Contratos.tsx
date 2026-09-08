@@ -175,6 +175,9 @@ export default function Contratos() {
     renovacaoContratoUrl?: string;
     renovacaoGarantiaDocumentoUrl?: string;
     renovacaoApoliceSeguroUrl?: string;
+    renovacao2ContratoUrl?: string;
+    renovacao2GarantiaDocumentoUrl?: string;
+    renovacao2ApoliceSeguroUrl?: string;
   }>({});
   // Toggle de "sem carência": quando marcado, esvazia e esconde os campos de data de carência.
   const [semCarencia, setSemCarencia] = useState(false);
@@ -184,6 +187,9 @@ export default function Contratos() {
   const [uploadingRenovacao, setUploadingRenovacao] = useState(false);
   const [uploadingGarantiaRenovacao, setUploadingGarantiaRenovacao] = useState(false);
   const [uploadingApoliceRenovacao, setUploadingApoliceRenovacao] = useState(false);
+  const [uploadingRenovacao2, setUploadingRenovacao2] = useState(false);
+  const [uploadingGarantiaRenovacao2, setUploadingGarantiaRenovacao2] = useState(false);
+  const [uploadingApoliceRenovacao2, setUploadingApoliceRenovacao2] = useState(false);
 
   const longTermProps = useMemo(() => (imoveis ?? []).filter((p) => p.tipoLocacao === "longa"), [imoveis]);
 
@@ -387,6 +393,9 @@ export default function Contratos() {
       renovacaoContratoUrl: c.renovacaoContratoUrl || undefined,
       renovacaoGarantiaDocumentoUrl: c.renovacaoGarantiaDocumentoUrl || undefined,
       renovacaoApoliceSeguroUrl: c.renovacaoApoliceSeguroUrl || undefined,
+      renovacao2ContratoUrl: c.renovacao2ContratoUrl || undefined,
+      renovacao2GarantiaDocumentoUrl: c.renovacao2GarantiaDocumentoUrl || undefined,
+      renovacao2ApoliceSeguroUrl: c.renovacao2ApoliceSeguroUrl || undefined,
     });
     setOpen(true);
   };
@@ -446,6 +455,21 @@ export default function Contratos() {
   const handleApoliceRenovacaoUpload = (contractId: number, file: File) =>
     uploadContractDoc("/api/upload/renovacao-apolice", contractId, file, setUploadingApoliceRenovacao, "Apólice de seguro da renovação enviada.", (data) =>
       setSavedDocs((prev) => ({ ...prev, renovacaoApoliceSeguroUrl: data.renovacaoApoliceSeguroUrl })),
+    );
+
+  const handleRenovacao2ContratoUpload = (contractId: number, file: File) =>
+    uploadContractDoc("/api/upload/renovacao2-contrato", contractId, file, setUploadingRenovacao2, "Contrato da 2ª renovação enviado.", (data) =>
+      setSavedDocs((prev) => ({ ...prev, renovacao2ContratoUrl: data.renovacao2ContratoUrl })),
+    );
+
+  const handleGarantiaRenovacao2Upload = (contractId: number, file: File) =>
+    uploadContractDoc("/api/upload/renovacao2-garantia", contractId, file, setUploadingGarantiaRenovacao2, "Documento da garantia da 2ª renovação enviado.", (data) =>
+      setSavedDocs((prev) => ({ ...prev, renovacao2GarantiaDocumentoUrl: data.renovacao2GarantiaDocumentoUrl })),
+    );
+
+  const handleApoliceRenovacao2Upload = (contractId: number, file: File) =>
+    uploadContractDoc("/api/upload/renovacao2-apolice", contractId, file, setUploadingApoliceRenovacao2, "Apólice de seguro da 2ª renovação enviada.", (data) =>
+      setSavedDocs((prev) => ({ ...prev, renovacao2ApoliceSeguroUrl: data.renovacao2ApoliceSeguroUrl })),
     );
 
   return (
@@ -840,8 +864,11 @@ export default function Contratos() {
                     {editingId === null && (
                       <p className="text-xs text-muted-foreground">Salve o contrato para habilitar os anexos.</p>
                     )}
-                    <div className={form.renovacaoAutomatica === "novo_contrato" ? "grid sm:grid-cols-2 gap-x-6 gap-y-3" : ""}>
+                    <div className={form.renovacaoAutomatica === "novo_contrato" ? "grid sm:grid-cols-3 gap-x-6 gap-y-3" : ""}>
                       <div className="space-y-3">
+                        {form.renovacaoAutomatica === "novo_contrato" && (
+                          <p className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wide">Original</p>
+                        )}
                         <DocumentoUploadRow
                           label="Contrato - 1ª Locação"
                           url={savedDocs.contratoLocacaoUrl}
@@ -869,32 +896,62 @@ export default function Contratos() {
                         />
                       </div>
                       {form.renovacaoAutomatica === "novo_contrato" && (
-                        <div className="space-y-3">
-                          <DocumentoUploadRow
-                            label="1ª Renovação"
-                            url={savedDocs.renovacaoContratoUrl}
-                            uploading={uploadingRenovacao}
-                            accept="application/pdf,image/jpeg,image/png,image/webp"
-                            disabled={editingId === null}
-                            onUpload={(file) => editingId !== null && handleRenovacaoContratoUpload(editingId, file)}
-                          />
-                          <DocumentoUploadRow
-                            label="Fiança renovada"
-                            url={savedDocs.renovacaoGarantiaDocumentoUrl}
-                            uploading={uploadingGarantiaRenovacao}
-                            accept="application/pdf,image/jpeg,image/png,image/webp"
-                            disabled={editingId === null}
-                            onUpload={(file) => editingId !== null && handleGarantiaRenovacaoUpload(editingId, file)}
-                          />
-                          <DocumentoUploadRow
-                            label="Apólice renovada"
-                            url={savedDocs.renovacaoApoliceSeguroUrl}
-                            uploading={uploadingApoliceRenovacao}
-                            accept="application/pdf,image/jpeg,image/png,image/webp"
-                            disabled={editingId === null}
-                            onUpload={(file) => editingId !== null && handleApoliceRenovacaoUpload(editingId, file)}
-                          />
-                        </div>
+                        <>
+                          <div className="space-y-3">
+                            <p className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wide">1ª Renovação</p>
+                            <DocumentoUploadRow
+                              label="Contrato"
+                              url={savedDocs.renovacaoContratoUrl}
+                              uploading={uploadingRenovacao}
+                              accept="application/pdf,image/jpeg,image/png,image/webp"
+                              disabled={editingId === null}
+                              onUpload={(file) => editingId !== null && handleRenovacaoContratoUpload(editingId, file)}
+                            />
+                            <DocumentoUploadRow
+                              label="Fiança renovada"
+                              url={savedDocs.renovacaoGarantiaDocumentoUrl}
+                              uploading={uploadingGarantiaRenovacao}
+                              accept="application/pdf,image/jpeg,image/png,image/webp"
+                              disabled={editingId === null}
+                              onUpload={(file) => editingId !== null && handleGarantiaRenovacaoUpload(editingId, file)}
+                            />
+                            <DocumentoUploadRow
+                              label="Apólice renovada"
+                              url={savedDocs.renovacaoApoliceSeguroUrl}
+                              uploading={uploadingApoliceRenovacao}
+                              accept="application/pdf,image/jpeg,image/png,image/webp"
+                              disabled={editingId === null}
+                              onUpload={(file) => editingId !== null && handleApoliceRenovacaoUpload(editingId, file)}
+                            />
+                          </div>
+                          <div className="space-y-3">
+                            <p className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wide">2ª Renovação</p>
+                            <DocumentoUploadRow
+                              label="Contrato"
+                              url={savedDocs.renovacao2ContratoUrl}
+                              uploading={uploadingRenovacao2}
+                              accept="application/pdf,image/jpeg,image/png,image/webp"
+                              disabled={editingId === null}
+                              onUpload={(file) => editingId !== null && handleRenovacao2ContratoUpload(editingId, file)}
+                            />
+                            <DocumentoUploadRow
+                              label="Fiança renovada"
+                              url={savedDocs.renovacao2GarantiaDocumentoUrl}
+                              uploading={uploadingGarantiaRenovacao2}
+                              accept="application/pdf,image/jpeg,image/png,image/webp"
+                              disabled={editingId === null}
+                              onUpload={(file) => editingId !== null && handleGarantiaRenovacao2Upload(editingId, file)}
+                            />
+                            <DocumentoUploadRow
+                              label="Apólice renovada"
+                              url={savedDocs.renovacao2ApoliceSeguroUrl}
+                              uploading={uploadingApoliceRenovacao2}
+                              accept="application/pdf,image/jpeg,image/png,image/webp"
+                              disabled={editingId === null}
+                              onUpload={(file) => editingId !== null && handleApoliceRenovacao2Upload(editingId, file)}
+                            />
+                          </div>
+                        </>
                       )}
                     </div>
                   </div>
@@ -1035,6 +1092,27 @@ export default function Contratos() {
                           uploading={uploadingApoliceRenovacao}
                           accept="application/pdf,image/jpeg,image/png,image/webp"
                           onUpload={(file) => handleApoliceRenovacaoUpload(selectedContract.id, file)}
+                        />
+                        <DocumentoUploadRow
+                          label="2ª Renovação"
+                          url={selectedContract.renovacao2ContratoUrl}
+                          uploading={uploadingRenovacao2}
+                          accept="application/pdf,image/jpeg,image/png,image/webp"
+                          onUpload={(file) => handleRenovacao2ContratoUpload(selectedContract.id, file)}
+                        />
+                        <DocumentoUploadRow
+                          label="Fiança renovada 2"
+                          url={selectedContract.renovacao2GarantiaDocumentoUrl}
+                          uploading={uploadingGarantiaRenovacao2}
+                          accept="application/pdf,image/jpeg,image/png,image/webp"
+                          onUpload={(file) => handleGarantiaRenovacao2Upload(selectedContract.id, file)}
+                        />
+                        <DocumentoUploadRow
+                          label="Apólice renovada 2"
+                          url={selectedContract.renovacao2ApoliceSeguroUrl}
+                          uploading={uploadingApoliceRenovacao2}
+                          accept="application/pdf,image/jpeg,image/png,image/webp"
+                          onUpload={(file) => handleApoliceRenovacao2Upload(selectedContract.id, file)}
                         />
                       </>
                     )}
