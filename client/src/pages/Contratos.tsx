@@ -731,7 +731,7 @@ export default function Contratos() {
                   {form.renovacaoAutomatica === "novo_contrato" && (
                     <div className="rounded-lg border border-border bg-secondary/50 p-3 space-y-3">
                       <p className="text-xs font-medium text-muted-foreground">Novo contrato</p>
-                      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${3 + renovacaoNovoContratoNumReajustes}, minmax(0, 1fr))` }}>
+                      <div className="grid grid-cols-3 gap-3">
                         <div className="grid gap-1.5">
                           <Label className="text-xs">Início</Label>
                           <DateInput
@@ -752,13 +752,23 @@ export default function Contratos() {
                           <Label className="text-xs">Fim</Label>
                           <Input value={renovacaoNovoContratoDataFimCalculada ? formatDate(renovacaoNovoContratoDataFimCalculada) : ""} disabled placeholder="Calculado" />
                         </div>
-                        {renovacaoNovoContratoDatasReajuste.map((data, i) => (
-                          <div key={data} className="grid gap-1.5">
-                            <Label className="text-xs">{renovacaoNovoContratoNumReajustes > 1 ? `${i + 1}º reajuste` : "Reajuste"}</Label>
-                            <Input value={formatDate(data)} disabled placeholder="Calculado" />
-                          </div>
-                        ))}
                       </div>
+                      {renovacaoNovoContratoNumReajustes > 0 && (
+                        <div className="grid grid-cols-2 gap-3">
+                          {renovacaoNovoContratoDatasReajuste.map((data, i) => (
+                            <div key={data} className="grid grid-cols-2 gap-2 items-end">
+                              <div className="grid gap-1.5">
+                                <Label className="text-xs">{renovacaoNovoContratoNumReajustes > 1 ? `${i + 1}º reajuste` : "Reajuste"}</Label>
+                                <Input value={formatDate(data)} disabled />
+                              </div>
+                              <div className="grid gap-1.5">
+                                <Label className="text-xs text-muted-foreground">Valor</Label>
+                                <Input value={form.renovacaoNovoContratoValor ? brl(Number(form.renovacaoNovoContratoValor)) : ""} disabled placeholder="—" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <div className="grid gap-1.5">
                         <Label className="text-xs">Valor do aluguel (R$)</Label>
                         <Input
