@@ -245,7 +245,7 @@ function DashboardLayoutContent({
                       isActive={isActive}
                       onClick={() => setLocation(item.path)}
                       tooltip={item.label}
-                      className={`h-10 transition-all font-normal rounded-md border-t border-r border-b border-sidebar-border/70 border-l-2 ${isActive ? "border-l-orange-500" : "border-l-sidebar-border/70"}`}
+                      className={`h-10 transition-all font-normal rounded-md border-t border-r border-b border-slate-300 dark:border-slate-600 border-l-2 ${isActive ? "border-l-orange-500" : "border-l-slate-300 dark:border-l-slate-600"}`}
                     >
                       <item.icon
                         className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
