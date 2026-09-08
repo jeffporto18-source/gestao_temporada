@@ -501,6 +501,11 @@ export const longTermContracts = mysqlTable("long_term_contracts", {
   renovacaoAutomatica: mysqlEnum("renovacaoAutomatica", ["novo_contrato", "prazo_indeterminado"]),
   renovacaoContratoUrl: varchar("renovacaoContratoUrl", { length: 500 }),
   renovacaoContratoKey: varchar("renovacaoContratoKey", { length: 255 }),
+  // Documentos da fiança e apólice referentes ao novo contrato da renovação (separados dos do contrato original).
+  renovacaoGarantiaDocumentoUrl: varchar("renovacaoGarantiaDocumentoUrl", { length: 500 }),
+  renovacaoGarantiaDocumentoKey: varchar("renovacaoGarantiaDocumentoKey", { length: 255 }),
+  renovacaoApoliceSeguroUrl: varchar("renovacaoApoliceSeguroUrl", { length: 500 }),
+  renovacaoApoliceSeguroKey: varchar("renovacaoApoliceSeguroKey", { length: 255 }),
   prazoIndeterminadoDataInicio: date("prazoIndeterminadoDataInicio", { mode: "string" }),
   prazoIndeterminadoValor: decimal("prazoIndeterminadoValor", { precision: 12, scale: 2 }),
   prazoIndeterminadoPrazoReajusteMeses: int("prazoIndeterminadoPrazoReajusteMeses"),

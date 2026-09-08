@@ -354,6 +354,108 @@ export function registerUploadRoutes(app: Express) {
   });
 
   /**
+   * POST /api/upload/renovacao-garantia
+   * Body: multipart/form-data with field "file" (PDF ou imagem) e "contractId" (number)
+   * Documento da garantia (fiador, caução, seguro fiança, etc.) do novo contrato da renovação.
+   * Returns: { renovacaoGarantiaDocumentoUrl, renovacaoGarantiaDocumentoKey }
+   */
+  app.post("/api/upload/renovacao-garantia", upload.single("file"), async (req: Request, res: Response) => {
+    try {
+      const ctx = await resolverContexto(req, res);
+      if (!ctx) return;
+      if (!ctx.podeEscrever) {
+        res.status(403).json({ error: "Seu acesso nesta empresa não permite anexar documentos." });
+        return;
+      }
+
+      const contractId = Number(req.body.contractId);
+      if (!contractId) {
+        res.status(400).json({ error: "contractId é obrigatório." });
+        return;
+      }
+
+      const file = req.file;
+      if (!file) {
+        res.status(400).json({ error: "Arquivo não enviado." });
+        return;
+      }
+
+      const ext = EXT_BY_MIME[file.mimetype];
+      if (!ext) {
+        res.status(400).json({ error: "Apenas PDF ou imagens (JPG, PNG, WEBP) são aceitos." });
+        return;
+      }
+
+      const contrato = await db.getLongTermContract(ctx.ownerId, contractId);
+      if (!contrato) {
+        res.status(404).json({ error: "Contrato não encontrado." });
+        return;
+      }
+
+      const relKey = `documentos/renovacao_garantia_${contractId}.${ext}`;
+      const { key, url } = await storagePut(relKey, file.buffer, file.mimetype);
+
+      await db.updateLongTermContract(ctx.ownerId, contractId, { renovacaoGarantiaDocumentoUrl: url, renovacaoGarantiaDocumentoKey: key });
+
+      res.json({ renovacaoGarantiaDocumentoUrl: url, renovacaoGarantiaDocumentoKey: key });
+    } catch (error: any) {
+      console.error("[Upload] Contract renewal guarantee document upload failed:", error);
+      res.status(500).json({ error: error.message || "Erro ao fazer upload do documento da garantia da renovação." });
+    }
+  });
+
+  /**
+   * POST /api/upload/renovacao-apolice
+   * Body: multipart/form-data with field "file" (PDF ou imagem) e "contractId" (number)
+   * Apólice de seguro do novo contrato da renovação.
+   * Returns: { renovacaoApoliceSeguroUrl, renovacaoApoliceSeguroKey }
+   */
+  app.post("/api/upload/renovacao-apolice", upload.single("file"), async (req: Request, res: Response) => {
+    try {
+      const ctx = await resolverContexto(req, res);
+      if (!ctx) return;
+      if (!ctx.podeEscrever) {
+        res.status(403).json({ error: "Seu acesso nesta empresa não permite anexar documentos." });
+        return;
+      }
+
+      const contractId = Number(req.body.contractId);
+      if (!contractId) {
+        res.status(400).json({ error: "contractId é obrigatório." });
+        return;
+      }
+
+      const file = req.file;
+      if (!file) {
+        res.status(400).json({ error: "Arquivo não enviado." });
+        return;
+      }
+
+      const ext = EXT_BY_MIME[file.mimetype];
+      if (!ext) {
+        res.status(400).json({ error: "Apenas PDF ou imagens (JPG, PNG, WEBP) são aceitos." });
+        return;
+      }
+
+      const contrato = await db.getLongTermContract(ctx.ownerId, contractId);
+      if (!contrato) {
+        res.status(404).json({ error: "Contrato não encontrado." });
+        return;
+      }
+
+      const relKey = `documentos/renovacao_apolice_${contractId}.${ext}`;
+      const { key, url } = await storagePut(relKey, file.buffer, file.mimetype);
+
+      await db.updateLongTermContract(ctx.ownerId, contractId, { renovacaoApoliceSeguroUrl: url, renovacaoApoliceSeguroKey: key });
+
+      res.json({ renovacaoApoliceSeguroUrl: url, renovacaoApoliceSeguroKey: key });
+    } catch (error: any) {
+      console.error("[Upload] Contract renewal insurance policy upload failed:", error);
+      res.status(500).json({ error: error.message || "Erro ao fazer upload da apólice de seguro da renovação." });
+    }
+  });
+
+  /**
    * POST /api/upload/comprovante-lancamento
    * Body: multipart/form-data with field "file" (PDF ou imagem) e "chargeId" (number)
    * Comprovante de pagamento/recebimento de uma ocorrência mensal de Contas a Pagar/Receber.
