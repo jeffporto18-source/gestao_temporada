@@ -803,7 +803,7 @@ export const appRouter = router({
     create: escritaProcedure
       .input(
         z.object({
-          propertyId: z.number(),
+          propertyId: z.number().nullable().optional(),
           chartAccountId: z.number(),
           descricao: z.string().optional(),
           contraparte: z.string().optional(),
@@ -818,7 +818,7 @@ export const appRouter = router({
         const { conta, nome } = await resolveChartAccount(ctx.ownerId, input.chartAccountId, CHART_ACCOUNT_GRUPOS);
         const id = await db.createLedgerEntry({
           ownerId: ctx.ownerId,
-          propertyId: input.propertyId,
+          propertyId: input.propertyId ?? null,
           chartAccountId: conta.id,
           grupo: conta.grupo,
           categoria: nome,
@@ -838,7 +838,7 @@ export const appRouter = router({
       .input(
         z.object({
           id: z.number(),
-          propertyId: z.number().optional(),
+          propertyId: z.number().nullable().optional(),
           chartAccountId: z.number().optional(),
           descricao: z.string().optional(),
           contraparte: z.string().optional(),

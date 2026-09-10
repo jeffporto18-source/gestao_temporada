@@ -323,6 +323,13 @@
       "when": 1786830841121,
       "tag": "0045_add_valor_reajuste",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "5",
+      "when": 1786830901121,
+      "tag": "0046_property_id_nullable_ledger",
+      "breakpoints": true
     }
   ]
 }

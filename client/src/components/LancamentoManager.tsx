@@ -133,7 +133,7 @@ export default function LancamentoManager({ titulo, subtitulo, grupos, contrapar
     const [ano, mes] = e.competenciaInicio.split("-");
     setEditingId(e.id);
     setForm({
-      propertyId: String(e.propertyId),
+      propertyId: e.propertyId !== null ? String(e.propertyId) : "empresa",
       chartAccountId: e.chartAccountId ? String(e.chartAccountId) : "",
       descricao: e.descricao || "",
       contraparte: e.contraparte || "",
@@ -154,13 +154,13 @@ export default function LancamentoManager({ titulo, subtitulo, grupos, contrapar
   const submit = () => {
     const valor = Number(form.valor);
     const dia = Number(form.dia);
-    if (!form.propertyId) { toast.error("Selecione o imóvel."); return; }
+    if (!form.propertyId) { toast.error("Selecione o imóvel ou a opção Empresa."); return; }
     if (!form.chartAccountId) { toast.error("Selecione a conta do plano."); return; }
     if (!valor || valor <= 0) { toast.error("Informe um valor válido."); return; }
     if (!dia || dia < 1 || dia > 31) { toast.error("Informe um dia válido (1-31)."); return; }
 
     const payload = {
-      propertyId: Number(form.propertyId),
+      propertyId: form.propertyId === "empresa" ? null : Number(form.propertyId),
       chartAccountId: Number(form.chartAccountId),
       descricao: form.descricao || undefined,
       contraparte: form.contraparte || undefined,
@@ -184,16 +184,34 @@ export default function LancamentoManager({ titulo, subtitulo, grupos, contrapar
 
       <Card className="p-5 mb-6">
         <div className="grid gap-4">
-          <div className="grid gap-1.5">
-            <Label>Imóvel</Label>
-            <Select value={form.propertyId} onValueChange={(v) => setForm((f) => ({ ...f, propertyId: v }))}>
-              <SelectTrigger><SelectValue placeholder="Selecione o imóvel..." /></SelectTrigger>
-              <SelectContent>
-                {imoveis?.map((p) => (
-                  <SelectItem key={p.id} value={String(p.id)}>{p.apelido}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid gap-1.5">
+              <Label>Imóvel</Label>
+              <Select
+                value={form.propertyId === "empresa" ? "" : form.propertyId}
+                onValueChange={(v) => setForm((f) => ({ ...f, propertyId: v }))}
+                disabled={form.propertyId === "empresa"}
+              >
+                <SelectTrigger><SelectValue placeholder={form.propertyId === "empresa" ? "— (lançamento da empresa)" : "Selecione o imóvel..."} /></SelectTrigger>
+                <SelectContent>
+                  {imoveis?.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>{p.apelido}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Empresa</Label>
+              <label className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-background cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-input"
+                  checked={form.propertyId === "empresa"}
+                  onChange={(e) => setForm((f) => ({ ...f, propertyId: e.target.checked ? "empresa" : "" }))}
+                />
+                <span className="text-sm">Sem imóvel (despesa/receita da empresa)</span>
+              </label>
+            </div>
           </div>
 
           <div className="grid gap-1.5">

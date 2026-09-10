@@ -68,7 +68,7 @@ export default function Relatorio() {
     propertyId: propertyId ? Number(propertyId) : undefined,
   });
 
-  const nomeImovel = (id: number) => imoveis?.find((p) => p.id === id)?.apelido ?? "—";
+  const nomeImovel = (id: number | null) => (id === null ? "Empresa" : imoveis?.find((p) => p.id === id)?.apelido ?? "—");
 
   const reabrir = trpc.ledgerCharges.reabrir.useMutation({
     onSuccess: () => { utils.ledgerCharges.list.invalidate(); toast.success("Movido de volta para em aberto."); },

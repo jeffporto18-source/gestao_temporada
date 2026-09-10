@@ -179,7 +179,8 @@ export const DEFAULT_CHART_ACCOUNTS: Record<"despesa_fixa" | "despesa_variavel" 
 export const ledgerEntries = mysqlTable("ledger_entries", {
   id: int("id").autoincrement().primaryKey(),
   ownerId: int("ownerId").notNull(),
-  propertyId: int("propertyId").notNull(),
+  // Nulo = lançamento da empresa, sem imóvel específico (ex.: despesas administrativas do escritório).
+  propertyId: int("propertyId"),
   chartAccountId: int("chartAccountId"), // referencia chart_accounts.id (nulo = desconto sem classificação, só com descrição)
   grupo: mysqlEnum("grupo", ["despesa_fixa", "despesa_variavel", "receita", "aporte_capital"]).notNull(), // denormalizado da conta, para consulta rápida
   categoria: varchar("categoria", { length: 300 }), // caminho da conta (denormalizado para consulta rápida)
@@ -214,7 +215,7 @@ export const ledgerCharges = mysqlTable("ledger_charges", {
   id: int("id").autoincrement().primaryKey(),
   ownerId: int("ownerId").notNull(),
   ledgerEntryId: int("ledgerEntryId").notNull(),
-  propertyId: int("propertyId").notNull(),
+  propertyId: int("propertyId"),
   grupo: mysqlEnum("grupo", ["despesa_fixa", "despesa_variavel", "receita", "aporte_capital"]).notNull(),
   categoria: varchar("categoria", { length: 300 }),
   descricao: varchar("descricao", { length: 300 }),
