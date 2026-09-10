@@ -1148,6 +1148,8 @@ export const appRouter = router({
           tipoAdministracao: z.enum(["propria", "administradora", "gestor_curta_temporada"]).default("propria"),
           imobiliariaId: z.number().optional(),
           valorAluguel: z.number().positive(),
+          valorReajuste1: z.number().positive().optional(),
+          valorReajuste2: z.number().positive().optional(),
           renovacaoAutomatica: z.enum(["novo_contrato", "prazo_indeterminado"]).optional(),
           prazoIndeterminadoDataInicio: z.string().optional(),
           prazoIndeterminadoValor: z.number().positive().optional(),
@@ -1180,6 +1182,8 @@ export const appRouter = router({
           dataInicio: rest.dataInicio,
           dataFim,
           dataReajuste,
+          valorReajuste1: rest.valorReajuste1 !== undefined ? String(rest.valorReajuste1) : null,
+          valorReajuste2: rest.valorReajuste2 !== undefined ? String(rest.valorReajuste2) : null,
           indiceCorrecao: rest.indiceCorrecao,
           nomeInquilino: rest.nomeInquilino || null,
           cpfCnpjInquilino: rest.cpfCnpjInquilino || null,
@@ -1276,6 +1280,8 @@ export const appRouter = router({
           dataInicio: z.string().optional(),
           dataFim: z.string().optional(),
           dataReajuste: z.string().optional(),
+          valorReajuste1: z.number().positive().nullable().optional(),
+          valorReajuste2: z.number().positive().nullable().optional(),
           indiceCorrecao: z.string().optional(),
           nomeInquilino: z.string().optional(),
           cpfCnpjInquilino: z.string().optional(),
@@ -1306,7 +1312,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const {
           id, dataInicio, dataFim, dataReajuste, carenciaInicio, carenciaFim, comissaoPct, prazoIndeterminadoValor, imobiliariaId,
-          renovacaoNovoContratoDataInicio, renovacaoNovoContratoPrazoMeses, renovacaoNovoContratoValor, ...rest
+          renovacaoNovoContratoDataInicio, renovacaoNovoContratoPrazoMeses, renovacaoNovoContratoValor, valorReajuste1, valorReajuste2, ...rest
         } = input;
         const contrato = await db.getLongTermContract(ctx.ownerId, id);
         // Recalcula fim/reajuste do novo contrato da renovação sempre que início ou prazo mudam,
@@ -1318,6 +1324,8 @@ export const appRouter = router({
           ...(comissaoPct !== undefined ? { comissaoPct: String(comissaoPct) } : {}),
           ...(prazoIndeterminadoValor !== undefined ? { prazoIndeterminadoValor: prazoIndeterminadoValor !== null ? String(prazoIndeterminadoValor) : null } : {}),
           ...(renovacaoNovoContratoValor !== undefined ? { renovacaoNovoContratoValor: renovacaoNovoContratoValor !== null ? String(renovacaoNovoContratoValor) : null } : {}),
+          ...(valorReajuste1 !== undefined ? { valorReajuste1: valorReajuste1 !== null ? String(valorReajuste1) : null } : {}),
+          ...(valorReajuste2 !== undefined ? { valorReajuste2: valorReajuste2 !== null ? String(valorReajuste2) : null } : {}),
           ...(imobiliariaId !== undefined
             ? { imobiliariaId: (rest.tipoAdministracao ?? contrato?.tipoAdministracao) === "administradora" ? imobiliariaId : null }
             : {}),

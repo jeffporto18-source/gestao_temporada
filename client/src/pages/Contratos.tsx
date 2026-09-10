@@ -34,6 +34,8 @@ interface ContractForm {
   carenciaInicio: string;
   carenciaFim: string;
   valorAluguel: string;
+  valorReajuste1: string;
+  valorReajuste2: string;
   nomeInquilino: string;
   cpfCnpjInquilino: string;
   contatoInquilino: string;
@@ -66,7 +68,7 @@ const RESPONSAVEL_CUSTO_LABELS: Record<CostResponsibility, string> = {
 
 const emptyForm: ContractForm = {
   propertyId: "", dataInicio: "", prazoMeses: "12", diaVencimentoAluguel: "10",
-  indiceCorrecao: "IGPM", carenciaInicio: "", carenciaFim: "", valorAluguel: "",
+  indiceCorrecao: "IGPM", carenciaInicio: "", carenciaFim: "", valorAluguel: "", valorReajuste1: "", valorReajuste2: "",
   nomeInquilino: "", cpfCnpjInquilino: "", contatoInquilino: "", telefoneInquilino: "", celularInquilino: "",
   whatsappInquilino: "", emailInquilino: "", tipoGarantia: "", comissaoPct: "0", tipoAdministracao: "propria", imobiliariaId: "",
   renovacaoAutomatica: "", prazoIndeterminadoDataInicio: "", prazoIndeterminadoValor: "", prazoIndeterminadoPrazoReajusteMeses: "12",
@@ -291,6 +293,8 @@ export default function Contratos() {
         diaVencimentoAluguel: Number(form.diaVencimentoAluguel) || 10,
         carenciaInicio: form.carenciaInicio || undefined,
         carenciaFim: form.carenciaFim || undefined,
+        valorReajuste1: form.valorReajuste1 ? Number(form.valorReajuste1) : null,
+        valorReajuste2: form.valorReajuste2 ? Number(form.valorReajuste2) : null,
         nomeInquilino: form.nomeInquilino || undefined,
         cpfCnpjInquilino: form.cpfCnpjInquilino || undefined,
         contatoInquilino: form.contatoInquilino || undefined,
@@ -325,6 +329,8 @@ export default function Contratos() {
       prazoMeses: prazoMesesNum,
       diaVencimentoAluguel: Number(form.diaVencimentoAluguel) || 10,
       valorAluguel: valor,
+      valorReajuste1: form.valorReajuste1 ? Number(form.valorReajuste1) : undefined,
+      valorReajuste2: form.valorReajuste2 ? Number(form.valorReajuste2) : undefined,
       carenciaInicio: form.carenciaInicio || undefined,
       carenciaFim: form.carenciaFim || undefined,
       nomeInquilino: form.nomeInquilino || undefined,
@@ -365,6 +371,8 @@ export default function Contratos() {
       carenciaInicio: c.carenciaInicio || "",
       carenciaFim: c.carenciaFim || "",
       valorAluguel: "",
+      valorReajuste1: c.valorReajuste1 ? String(c.valorReajuste1) : "",
+      valorReajuste2: c.valorReajuste2 ? String(c.valorReajuste2) : "",
       nomeInquilino: c.nomeInquilino || "",
       cpfCnpjInquilino: c.cpfCnpjInquilino || "",
       contatoInquilino: c.contatoInquilino || "",
@@ -661,7 +669,25 @@ export default function Contratos() {
                           </div>
                           <div className="grid gap-1.5">
                             <Label className="text-xs text-muted-foreground">Valor</Label>
-                            <Input value={form.valorAluguel ? brl(Number(form.valorAluguel)) : ""} disabled placeholder="—" />
+                            {i === 0 ? (
+                              <Input
+                                value={form.valorReajuste1}
+                                onChange={(e) => setForm({ ...form, valorReajuste1: e.target.value })}
+                                type="number"
+                                step="0.01"
+                                placeholder="R$"
+                              />
+                            ) : i === 1 ? (
+                              <Input
+                                value={form.valorReajuste2}
+                                onChange={(e) => setForm({ ...form, valorReajuste2: e.target.value })}
+                                type="number"
+                                step="0.01"
+                                placeholder="R$"
+                              />
+                            ) : (
+                              <Input value={form.valorAluguel ? brl(Number(form.valorAluguel)) : ""} disabled placeholder="—" />
+                            )}
                           </div>
                         </div>
                       ))}

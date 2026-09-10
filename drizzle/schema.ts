@@ -467,6 +467,10 @@ export const longTermContracts = mysqlTable("long_term_contracts", {
   dataInicio: date("dataInicio", { mode: "string" }).notNull(),
   dataFim: date("dataFim", { mode: "string" }).notNull(),
   dataReajuste: date("dataReajuste", { mode: "string" }),
+  // Valor do aluguel após o 1º e o 2º reajuste, preenchido manualmente (o índice de correção real
+  // só é conhecido na data do reajuste, não dá pra calcular automaticamente no cadastro).
+  valorReajuste1: decimal("valorReajuste1", { precision: 12, scale: 2 }),
+  valorReajuste2: decimal("valorReajuste2", { precision: 12, scale: 2 }),
   indiceCorrecao: varchar("indiceCorrecao", { length: 50 }).notNull().default("IGPM"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
