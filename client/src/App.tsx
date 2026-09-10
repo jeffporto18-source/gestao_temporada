@@ -19,6 +19,7 @@ import Receitas from "./pages/Receitas";
 import Despesas from "./pages/Despesas";
 import Relatorio from "./pages/Relatorio";
 import Aportes from "./pages/Aportes";
+import RepasseCaucao from "./pages/RepasseCaucao";
 import Fornecedores from "./pages/Fornecedores";
 import Socios from "./pages/Socios";
 import PlanoContas from "./pages/PlanoContas";
@@ -158,6 +159,11 @@ function App() {
             <Route path="/aportes">
               <RequireAuth>
                 <DashboardLayout><Aportes /></DashboardLayout>
+              </RequireAuth>
+            </Route>
+            <Route path="/repasse-caucao">
+              <RequireAuth>
+                <DashboardLayout><RepasseCaucao /></DashboardLayout>
               </RequireAuth>
             </Route>
             <Route path="/fornecedores">

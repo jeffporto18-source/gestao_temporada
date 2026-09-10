@@ -14,9 +14,9 @@ import { ENV } from "./_core/env";
 // (parentId nulo) definem a natureza (grupo); sub-contas em qualquer nível herdam a
 // natureza da conta principal ancestral. Usado pelos lançamentos e pelo desconto de aluguel.
 
-type ChartAccountGrupo = "conta_principal" | "despesa_fixa" | "despesa_variavel" | "receita" | "aporte_capital";
-// Naturezas lançáveis (usadas em Receitas/Despesas/Aportes); "conta_principal" é apenas um contêiner sem natureza definida.
-const CHART_ACCOUNT_GRUPOS: Exclude<ChartAccountGrupo, "conta_principal">[] = ["despesa_fixa", "despesa_variavel", "receita", "aporte_capital"];
+type ChartAccountGrupo = "conta_principal" | "despesa_fixa" | "despesa_variavel" | "receita" | "aporte_capital" | "repasse_caucao";
+// Naturezas lançáveis (usadas em Receitas/Despesas/Aportes/Repasse de Caução); "conta_principal" é apenas um contêiner sem natureza definida.
+const CHART_ACCOUNT_GRUPOS: Exclude<ChartAccountGrupo, "conta_principal">[] = ["despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao"];
 const CHART_ACCOUNT_MAX_DEPTH = 3; // 4 níveis: 0=conta principal, 1=conta, 2=subconta, 3=sub-subconta
 
 const num = (v: number | string | null) => Number(v ?? 0);
@@ -756,7 +756,7 @@ export const appRouter = router({
   // ------------------------------------------------------------- plano de contas
   chartAccounts: router({
     list: empresaProcedure
-      .input(z.object({ grupo: z.enum(["conta_principal", "despesa_fixa", "despesa_variavel", "receita", "aporte_capital"]).optional() }).optional())
+      .input(z.object({ grupo: z.enum(["conta_principal", "despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao"]).optional() }).optional())
       .query(async ({ ctx, input }) => {
         const all = await db.seedDefaultChartAccountsIfNeeded(ctx.ownerId);
         return input?.grupo ? all.filter((a) => a.grupo === input.grupo) : all;
@@ -764,7 +764,7 @@ export const appRouter = router({
     create: escritaProcedure
       .input(
         z.object({
-          grupo: z.enum(["conta_principal", "despesa_fixa", "despesa_variavel", "receita", "aporte_capital"]).optional(),
+          grupo: z.enum(["conta_principal", "despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao"]).optional(),
           nome: z.string().min(1),
           parentId: z.number().optional(),
         }),
@@ -796,7 +796,7 @@ export const appRouter = router({
       .input(
         z.object({
           propertyId: z.number().optional(),
-          grupo: z.enum(["despesa_fixa", "despesa_variavel", "receita", "aporte_capital"]).optional(),
+          grupo: z.enum(["despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao"]).optional(),
         }),
       )
       .query(({ ctx, input }) => db.listLedgerEntries(ctx.ownerId, input.propertyId, input.grupo)),
@@ -887,7 +887,7 @@ export const appRouter = router({
       .input(
         z.object({
           propertyId: z.number().optional(),
-          grupo: z.enum(["despesa_fixa", "despesa_variavel", "receita", "aporte_capital"]).optional(),
+          grupo: z.enum(["despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao"]).optional(),
           status: z.enum(["aberto", "pago", "cancelado"]).optional(),
         }),
       )

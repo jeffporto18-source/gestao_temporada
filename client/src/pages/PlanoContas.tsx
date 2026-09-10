@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { Plus, Trash2, Pencil, Check, X, ChevronRight, ChevronDown } from "lucide-react";
 import { PageHeader } from "./Clientes";
 
-type Grupo = "conta_principal" | "despesa_fixa" | "despesa_variavel" | "receita" | "aporte_capital";
+type Grupo = "conta_principal" | "despesa_fixa" | "despesa_variavel" | "receita" | "aporte_capital" | "repasse_caucao";
 type ChartAccount = RouterOutputs["chartAccounts"]["list"][number];
 
 const GRUPO_LABELS: Record<Grupo, string> = {
@@ -23,6 +23,7 @@ const GRUPO_LABELS: Record<Grupo, string> = {
   despesa_variavel: "Despesa Variável",
   receita: "Receita",
   aporte_capital: "Aporte de Capital",
+  repasse_caucao: "Repasse de Caução (não entra na DRE)",
 };
 
 const MAX_DEPTH = 3; // 4 níveis: 0=conta principal, 1=conta, 2=subconta (modalidade), 3=sub-subconta (despesa)

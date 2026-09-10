@@ -25,7 +25,7 @@ import { brl, formatDate, formatCompetencia } from "@/lib/format";
 import { PageHeader, EmptyState, SkeletonList } from "./Clientes";
 
 type Charge = RouterOutputs["ledgerCharges"]["list"][number];
-type Tipo = "" | "despesa" | "receita" | "aporte";
+type Tipo = "" | "despesa" | "receita" | "aporte" | "repasse";
 type Situacao = "" | "aberto" | "pago" | "cancelado";
 
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -38,16 +38,18 @@ function anosDisponiveis(): number[] {
 }
 
 const GRUPOS_DO_TIPO: Record<Tipo, Charge["grupo"][]> = {
-  "": ["despesa_fixa", "despesa_variavel", "receita", "aporte_capital"],
+  "": ["despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao"],
   despesa: ["despesa_fixa", "despesa_variavel"],
   receita: ["receita"],
   aporte: ["aporte_capital"],
+  repasse: ["repasse_caucao"],
 };
 
-/** Rótulo da ação de baixa: aluga/vende (receita), aporta capital, ou paga uma despesa. */
+/** Rótulo da ação de baixa: aluga/vende (receita), aporta capital, repassa caução, ou paga uma despesa. */
 function rotuloBaixa(grupo: Charge["grupo"]) {
   if (grupo === "receita") return "Marcar como recebido";
   if (grupo === "aporte_capital") return "Confirmar aporte";
+  if (grupo === "repasse_caucao") return "Confirmar repasse";
   return "Dar baixa";
 }
 
@@ -102,10 +104,11 @@ export default function Relatorio() {
           const valor = c.status === "pago" ? Number(c.valorPago ?? c.valor) : Number(c.valor);
           if (c.grupo === "receita") acc.receita += valor;
           else if (c.grupo === "aporte_capital") acc.aporte += valor;
+          else if (c.grupo === "repasse_caucao") acc.repasse += valor;
           else acc.despesa += valor;
           return acc;
         },
-        { receita: 0, despesa: 0, aporte: 0 },
+        { receita: 0, despesa: 0, aporte: 0, repasse: 0 },
       ),
     [charges],
   );
@@ -144,7 +147,7 @@ export default function Relatorio() {
         <h2 className="text-base font-serif font-bold">Relatório · {periodo}</h2>
       </div>
 
-      <div className="mb-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="mb-4 grid grid-cols-2 sm:grid-cols-5 gap-3">
         <Card className="px-4 py-2.5">
           <p className="text-[11px] text-muted-foreground">Receitas · {periodo}</p>
           <p className="text-lg font-serif font-semibold text-primary leading-tight">{brl(totais.receita)}</p>
@@ -160,6 +163,10 @@ export default function Relatorio() {
         <Card className="px-4 py-2.5">
           <p className="text-[11px] text-muted-foreground">Aportes de sócios</p>
           <p className="text-lg font-serif font-semibold leading-tight">{brl(totais.aporte)}</p>
+        </Card>
+        <Card className="px-4 py-2.5">
+          <p className="text-[11px] text-muted-foreground">Repasse de caução</p>
+          <p className="text-lg font-serif font-semibold leading-tight">{brl(totais.repasse)}</p>
         </Card>
       </div>
 
@@ -216,6 +223,7 @@ export default function Relatorio() {
                 <SelectItem value="receita">Só receitas</SelectItem>
                 <SelectItem value="despesa">Só despesas</SelectItem>
                 <SelectItem value="aporte">Só aportes</SelectItem>
+                <SelectItem value="repasse">Só repasses de caução</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -249,7 +257,7 @@ export default function Relatorio() {
       {isLoading ? (
         <SkeletonList />
       ) : !grupos.length ? (
-        <EmptyState title="Nada por aqui" subtitle="Cadastre contas em Contas a Pagar, Contas a Receber ou Aportes para elas aparecerem aqui mês a mês." />
+        <EmptyState title="Nada por aqui" subtitle="Cadastre contas em Contas a Pagar, Contas a Receber, Aportes ou Repasse de Caução para elas aparecerem aqui mês a mês." />
       ) : (
         <div className="space-y-3">
           {grupos.map((g) => (

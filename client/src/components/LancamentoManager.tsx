@@ -18,7 +18,7 @@ import { brl, formatCompetencia, addMesesCompetencia } from "@/lib/format";
 import { PageHeader, EmptyState } from "@/pages/Clientes";
 import { Link } from "wouter";
 
-type Grupo = "despesa_fixa" | "despesa_variavel" | "receita" | "aporte_capital";
+type Grupo = "despesa_fixa" | "despesa_variavel" | "receita" | "aporte_capital" | "repasse_caucao";
 type ChartAccount = RouterOutputs["chartAccounts"]["list"][number];
 
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];

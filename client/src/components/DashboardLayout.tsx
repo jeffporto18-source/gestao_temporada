@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, Building2, Receipt, BookOpen, CalendarDays, FileText, BarChart3, Upload, UserCog, UsersRound, Landmark, UserCog2, FileSignature, Package, Wallet, TrendingUp, Truck, PieChart, ClipboardList, ClipboardCheck, ScrollText, UserRound, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, Building2, Receipt, BookOpen, CalendarDays, FileText, BarChart3, Upload, UserCog, UsersRound, Landmark, UserCog2, FileSignature, Package, Wallet, TrendingUp, Truck, PieChart, ClipboardList, ClipboardCheck, ScrollText, UserRound, ShieldCheck, Banknote } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -45,6 +45,7 @@ const allMenuItems = [
   { icon: ClipboardCheck, label: "Relatório", path: "/relatorio", hideFor: [] as string[] },
   { icon: Truck, label: "Fornecedores", path: "/fornecedores", hideFor: [] as string[] },
   { icon: BookOpen, label: "Plano de Contas", path: "/plano-contas", hideFor: [] as string[] },
+  { icon: Banknote, label: "Repasse de Caução", path: "/repasse-caucao", hideFor: [] as string[] },
   { icon: Package, label: "Inventário", path: "/inventario", hideFor: [] as string[] },
   // `somenteTotal` esconde as telas de resultado financeiro de quem não tem acesso a elas. O
   // servidor já recusa essas rotas por conta própria; esconder aqui evita oferecer ao usuário um

@@ -153,7 +153,7 @@ export type InsertProperty = typeof properties.$inferInsert;
 export const chartAccounts = mysqlTable("chart_accounts", {
   id: int("id").autoincrement().primaryKey(),
   ownerId: int("ownerId").notNull(),
-  grupo: mysqlEnum("grupo", ["conta_principal", "despesa_fixa", "despesa_variavel", "receita", "aporte_capital"]).notNull(),
+  grupo: mysqlEnum("grupo", ["conta_principal", "despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao"]).notNull(),
   nome: varchar("nome", { length: 100 }).notNull(),
   parentId: int("parentId"), // null = conta principal (nível 0); caso contrário, aponta para o pai imediato (máx. nível 3)
   ativa: int("ativa").notNull().default(1),
@@ -182,7 +182,7 @@ export const ledgerEntries = mysqlTable("ledger_entries", {
   // Nulo = lançamento da empresa, sem imóvel específico (ex.: despesas administrativas do escritório).
   propertyId: int("propertyId"),
   chartAccountId: int("chartAccountId"), // referencia chart_accounts.id (nulo = desconto sem classificação, só com descrição)
-  grupo: mysqlEnum("grupo", ["despesa_fixa", "despesa_variavel", "receita", "aporte_capital"]).notNull(), // denormalizado da conta, para consulta rápida
+  grupo: mysqlEnum("grupo", ["despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao"]).notNull(), // denormalizado da conta, para consulta rápida
   categoria: varchar("categoria", { length: 300 }), // caminho da conta (denormalizado para consulta rápida)
   descricao: varchar("descricao", { length: 300 }),
   contraparte: varchar("contraparte", { length: 150 }), // cliente/origem (receita) ou fornecedor (despesa/aporte)
@@ -216,7 +216,7 @@ export const ledgerCharges = mysqlTable("ledger_charges", {
   ownerId: int("ownerId").notNull(),
   ledgerEntryId: int("ledgerEntryId").notNull(),
   propertyId: int("propertyId"),
-  grupo: mysqlEnum("grupo", ["despesa_fixa", "despesa_variavel", "receita", "aporte_capital"]).notNull(),
+  grupo: mysqlEnum("grupo", ["despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao"]).notNull(),
   categoria: varchar("categoria", { length: 300 }),
   descricao: varchar("descricao", { length: 300 }),
   contraparte: varchar("contraparte", { length: 150 }),

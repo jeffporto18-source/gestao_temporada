@@ -330,6 +330,13 @@
       "when": 1786830901121,
       "tag": "0046_property_id_nullable_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "5",
+      "when": 1786830961121,
+      "tag": "0047_add_repasse_caucao_grupo",
+      "breakpoints": true
     }
   ]
 }
