@@ -1,11 +1,12 @@
-// Conciliação bancária: lê os créditos (entradas) de um extrato em planilha Excel anexado em
-// Extratos e casa cada um, por valor, com as parcelas de Contas a Receber do mês (lançamentos
-// manuais de receita, parcelas de contrato de longa duração e reservas de curta temporada), para
-// apontar o que está faltando lançar e o que entrou no banco sem lançamento correspondente.
+// Conciliação bancária: lê os movimentos (entradas e saídas) de um extrato em planilha Excel
+// anexado em Extratos e casa cada um, por valor, com as parcelas de Contas a Receber e Contas a
+// Pagar do mês, para apontar o que está faltando lançar e o que movimentou no banco sem
+// lançamento correspondente.
 //
-// Reservas de curta temporada (Airbnb) usam o VALOR LÍQUIDO recebido (após taxas do Airbnb), não o
-// valor bruto lançado no plano de contas — é o líquido que efetivamente cai na conta, então é ele
-// que precisa bater com o extrato.
+// Contas a Receber inclui lançamentos manuais de receita, parcelas de contrato de longa duração e
+// reservas de curta temporada. Reservas (Airbnb) usam o VALOR LÍQUIDO recebido (após taxas do
+// Airbnb), não o valor bruto lançado no plano de contas — é o líquido que efetivamente cai na
+// conta, então é ele que precisa bater com o extrato.
 
 import * as XLSX from "xlsx";
 import * as db from "./db";
@@ -17,7 +18,7 @@ const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 interface MovimentoExtrato {
   data: string; // "AAAA-MM-DD"
   descricao: string;
-  valor: number;
+  valor: number; // sempre positivo — a direção (entrada/saída) já separa as listas
 }
 
 /** Converte "DD/MM/AAAA" (formato usual de extrato bancário) ou uma data do Excel em "AAAA-MM-DD". */
@@ -43,13 +44,13 @@ function normalizarValor(v: unknown): number | null {
 }
 
 /**
- * Lê os créditos (entradas) de uma planilha de extrato bancário. O formato exato varia por banco,
- * mas todos têm uma linha de cabeçalho com uma coluna de data e uma de valor (entradas/saídas ou só
- * valor) — localiza essa linha por nome da coluna em vez de assumir uma posição fixa. Ignora
- * rendimento de aplicação e estornos: não são aluguel, e como acontecem quase todo dia só
- * atrapalhariam a conciliação.
+ * Lê os movimentos de uma planilha de extrato bancário, separados em entradas (créditos) e saídas
+ * (débitos). O formato exato varia por banco, mas todos têm uma linha de cabeçalho com uma coluna
+ * de data e uma de valor (entradas/saídas ou só valor) — localiza essa linha por nome da coluna em
+ * vez de assumir uma posição fixa. Ignora rendimento de aplicação e estornos: não são aluguel nem
+ * despesa, e como acontecem quase todo dia só atrapalhariam a conciliação.
  */
-function lerEntradasDoExtrato(buffer: Buffer): MovimentoExtrato[] {
+function lerMovimentosDoExtrato(buffer: Buffer): { entradas: MovimentoExtrato[]; saidas: MovimentoExtrato[] } {
   const wb = XLSX.read(buffer, { type: "buffer", cellDates: true });
   const sheet = wb.Sheets[wb.SheetNames[0]];
   if (!sheet) throw new Error("A planilha não tem nenhuma aba com dados.");
@@ -76,22 +77,40 @@ function lerEntradasDoExtrato(buffer: Buffer): MovimentoExtrato[] {
     throw new Error("Não reconheci o formato da planilha — esperava uma coluna de data e uma de valor (entradas/saídas).");
   }
 
-  const movimentos: MovimentoExtrato[] = [];
+  const entradas: MovimentoExtrato[] = [];
+  const saidas: MovimentoExtrato[] = [];
   for (let i = headerIdx + 1; i < linhas.length; i++) {
     const linha = linhas[i];
     if (!Array.isArray(linha) || linha.length === 0) continue;
     const data = normalizarData(linha[colData]);
     const valor = normalizarValor(linha[colValor]);
-    if (!data || valor === null || valor <= 0) continue; // só créditos (entradas)
+    if (!data || valor === null || valor === 0) continue;
     const descricao = colDescricao !== -1 ? String(linha[colDescricao] ?? "") : "";
     if (/rendimento|estorno/i.test(descricao)) continue;
-    movimentos.push({ data, descricao, valor: round2(valor) });
+    const movimento = { data, descricao, valor: round2(Math.abs(valor)) };
+    if (valor > 0) entradas.push(movimento);
+    else saidas.push(movimento);
   }
-  return movimentos;
+  return { entradas, saidas };
+}
+
+/** Casa cada item com UMA entrada/saída de mesmo valor no extrato (multiset: um movimento só cobre
+ * um item por vez, mesmo que dois tenham valores idênticos por coincidência). Marca in-place e
+ * devolve os movimentos que sobraram sem casar com nada. */
+function conciliarPorValor(itens: ItemConciliacao[], movimentos: MovimentoExtrato[]): MovimentoExtrato[] {
+  const disponiveis = [...movimentos];
+  for (const item of itens) {
+    const idx = disponiveis.findIndex((m) => m.valor === item.valor);
+    if (idx !== -1) {
+      item.encontradoNoExtrato = true;
+      disponiveis.splice(idx, 1);
+    }
+  }
+  return disponiveis;
 }
 
 export interface ItemConciliacao {
-  tipo: "ledger" | "contrato" | "reserva";
+  tipo: "ledger" | "contrato" | "reserva" | "despesa";
   id: number;
   descricao: string;
   valor: number;
@@ -106,9 +125,13 @@ export interface ResultadoConciliacao {
   entradasSemLancamento: MovimentoExtrato[];
   totalRecebiveis: number;
   totalConciliados: number;
+  pagaveis: ItemConciliacao[];
+  saidasSemLancamento: MovimentoExtrato[];
+  totalPagaveis: number;
+  totalPagaveisConciliados: number;
 }
 
-/** Concilia o extrato anexado no mês/ano com as Contas a Receber da mesma competência. */
+/** Concilia o extrato anexado no mês/ano com as Contas a Receber e Contas a Pagar da mesma competência. */
 export async function conciliarExtratoContasAReceber(ownerId: number, ano: number, mes: number): Promise<ResultadoConciliacao> {
   const extrato = await db.getStatement(ownerId, ano, mes);
   if (!extrato?.arquivoKey) throw new Error("Nenhum extrato anexado para este mês.");
@@ -117,18 +140,22 @@ export async function conciliarExtratoContasAReceber(ownerId: number, ano: numbe
   }
 
   const buffer = await storageGetBuffer(extrato.arquivoKey);
-  const entradas = lerEntradasDoExtrato(buffer);
+  const { entradas, saidas } = lerMovimentosDoExtrato(buffer);
 
   const competencia = `${ano}-${String(mes).padStart(2, "0")}`;
 
-  const [ledgerCharges, contratosCharges, contratos, properties, reservasPorCheckin, reservasPorRecebimento] = await Promise.all([
-    db.listLedgerCharges(ownerId, { grupo: "receita" }),
-    db.listContractRentChargesByCompetencia(ownerId, competencia),
-    db.listLongTermContracts(ownerId),
-    db.listProperties(ownerId),
-    db.listReservations(ownerId, undefined, competencia),
-    db.listReservationsRecebidasNaCompetencia(ownerId, competencia),
-  ]);
+  const [ledgerChargesReceita, ledgerChargesDespesa, contratosCharges, contratos, properties, reservasPorCheckin, reservasPorRecebimento] =
+    await Promise.all([
+      db.listLedgerCharges(ownerId, { grupo: "receita" }),
+      db.listLedgerCharges(ownerId, { grupo: "despesa_fixa" }),
+      db.listContractRentChargesByCompetencia(ownerId, competencia),
+      db.listLongTermContracts(ownerId),
+      db.listProperties(ownerId),
+      db.listReservations(ownerId, undefined, competencia),
+      db.listReservationsRecebidasNaCompetencia(ownerId, competencia),
+    ]);
+  // despesa_variavel entra separado porque o filtro do listLedgerCharges é por um grupo só.
+  const ledgerChargesDespesaVariavel = await db.listLedgerCharges(ownerId, { grupo: "despesa_variavel" });
 
   const contratoPorId = new Map(contratos.map((c) => [c.id, c]));
   const propriedadePorId = new Map(properties.map((p) => [p.id, p]));
@@ -136,7 +163,10 @@ export async function conciliarExtratoContasAReceber(ownerId: number, ano: numbe
   // buscas (por competência do check-in e por competência do recebimento já confirmado) sem duplicar.
   const reservasDoMes = Array.from(new Map([...reservasPorCheckin, ...reservasPorRecebimento].map((r) => [r.id, r])).values());
 
-  const receitasDoMes = ledgerCharges.filter((c) => c.competencia === competencia && c.status !== "cancelado");
+  const receitasDoMes = ledgerChargesReceita.filter((c) => c.competencia === competencia && c.status !== "cancelado");
+  const despesasDoMes = [...ledgerChargesDespesa, ...ledgerChargesDespesaVariavel].filter(
+    (c) => c.competencia === competencia && c.status !== "cancelado",
+  );
 
   const recebiveis: ItemConciliacao[] = [
     ...receitasDoMes.map((c) => ({
@@ -148,20 +178,19 @@ export async function conciliarExtratoContasAReceber(ownerId: number, ano: numbe
       status: c.status,
       encontradoNoExtrato: false,
     })),
-    ...contratosCharges
-      .map((c) => {
-        const contrato = contratoPorId.get(c.contractId);
-        const prop = contrato ? propriedadePorId.get(contrato.propertyId) : undefined;
-        return {
-          tipo: "contrato" as const,
-          id: c.id,
-          descricao: `Aluguel — ${prop?.apelido ?? "Imóvel"}${contrato?.nomeInquilino ? ` (${contrato.nomeInquilino})` : ""}`,
-          valor: round2(c.status === "recebido" ? num(c.valorRecebido ?? c.valor) : num(c.valor)),
-          data: c.dataVencimento,
-          status: c.status,
-          encontradoNoExtrato: false,
-        };
-      }),
+    ...contratosCharges.map((c) => {
+      const contrato = contratoPorId.get(c.contractId);
+      const prop = contrato ? propriedadePorId.get(contrato.propertyId) : undefined;
+      return {
+        tipo: "contrato" as const,
+        id: c.id,
+        descricao: `Aluguel — ${prop?.apelido ?? "Imóvel"}${contrato?.nomeInquilino ? ` (${contrato.nomeInquilino})` : ""}`,
+        valor: round2(c.status === "recebido" ? num(c.valorRecebido ?? c.valor) : num(c.valor)),
+        data: c.dataVencimento,
+        status: c.status,
+        encontradoNoExtrato: false,
+      };
+    }),
     ...reservasDoMes.map((r) => {
       const prop = propriedadePorId.get(r.propertyId);
       return {
@@ -176,22 +205,28 @@ export async function conciliarExtratoContasAReceber(ownerId: number, ano: numbe
     }),
   ];
 
-  // Casa cada recebível com UMA entrada de mesmo valor no extrato (multiset: uma entrada só cobre
-  // um recebível por vez, mesmo que dois tenham valores idênticos por coincidência).
-  const entradasDisponiveis = [...entradas];
-  for (const item of recebiveis) {
-    const idx = entradasDisponiveis.findIndex((e) => e.valor === item.valor);
-    if (idx !== -1) {
-      item.encontradoNoExtrato = true;
-      entradasDisponiveis.splice(idx, 1);
-    }
-  }
+  const pagaveis: ItemConciliacao[] = despesasDoMes.map((c) => ({
+    tipo: "despesa" as const,
+    id: c.id,
+    descricao: c.descricao || (c.contraparte ? `${c.categoria || "Despesa"} — ${c.contraparte}` : c.categoria || "Despesa"),
+    valor: round2(c.status === "pago" ? num(c.valorPago ?? c.valor) : num(c.valor)),
+    data: c.dataVencimento,
+    status: c.status,
+    encontradoNoExtrato: false,
+  }));
+
+  const entradasSemLancamento = conciliarPorValor(recebiveis, entradas);
+  const saidasSemLancamento = conciliarPorValor(pagaveis, saidas);
 
   return {
     competencia,
     recebiveis,
-    entradasSemLancamento: entradasDisponiveis,
+    entradasSemLancamento,
     totalRecebiveis: recebiveis.length,
     totalConciliados: recebiveis.filter((r) => r.encontradoNoExtrato).length,
+    pagaveis,
+    saidasSemLancamento,
+    totalPagaveis: pagaveis.length,
+    totalPagaveisConciliados: pagaveis.filter((p) => p.encontradoNoExtrato).length,
   };
 }

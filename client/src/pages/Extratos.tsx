@@ -115,7 +115,33 @@ function AnexoMes({
   );
 }
 
-/** Resultado da conciliação de um mês: parcelas de Contas a Receber casadas por valor com os créditos do extrato. */
+/** Uma linha de item conciliado (conta a receber/pagar), com ✓ ou ⚠ conforme achou no extrato. */
+function LinhaItem({ ok, texto, valor }: { ok: boolean; texto: string; valor: number }) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-3 py-2 text-sm min-w-0">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        {ok ? <CheckCircle2 className="h-4 w-4 text-primary shrink-0" /> : <TriangleAlert className="h-4 w-4 text-amber-600 shrink-0" />}
+        <span className="truncate">{texto}</span>
+      </div>
+      <span className="tabular-nums font-medium shrink-0 pl-2">{brl(valor)}</span>
+    </div>
+  );
+}
+
+/** Uma linha de movimento do extrato sem lançamento correspondente no sistema. */
+function LinhaSemLancamento({ texto, valor }: { texto: string; valor: number }) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-3 py-2 text-sm min-w-0">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        <HelpCircle className="h-4 w-4 text-muted-foreground shrink-0" />
+        <span className="truncate">{texto}</span>
+      </div>
+      <span className="tabular-nums font-medium shrink-0 pl-2">{brl(valor)}</span>
+    </div>
+  );
+}
+
+/** Resultado da conciliação de um mês: Contas a Receber/Pagar casadas por valor com o extrato. */
 function ConciliacaoDialog({ ano, mes, onOpenChange }: { ano: number; mes: number | null; onOpenChange: (open: boolean) => void }) {
   const { data, isLoading, error } = trpc.statements.conciliar.useQuery(
     { ano, mes: mes ?? 1 },
@@ -124,7 +150,7 @@ function ConciliacaoDialog({ ano, mes, onOpenChange }: { ano: number; mes: numbe
 
   return (
     <Dialog open={mes !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto overflow-x-hidden">
+      <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto min-w-0">
         <DialogHeader>
           <DialogTitle className="font-serif">
             Conciliação — {mes !== null ? MESES[mes - 1] : ""}/{ano}
@@ -136,29 +162,19 @@ function ConciliacaoDialog({ ano, mes, onOpenChange }: { ano: number; mes: numbe
         ) : error ? (
           <p className="text-sm text-destructive py-4">{error.message}</p>
         ) : !data ? null : (
-          <div className="grid gap-4">
+          <div className="grid gap-4 min-w-0">
             <p className="text-sm text-muted-foreground">
-              {data.totalConciliados} de {data.totalRecebiveis} contas a receber deste mês foram encontradas no extrato.
+              {data.totalConciliados} de {data.totalRecebiveis} contas a receber e {data.totalPagaveisConciliados} de {data.totalPagaveis} contas a pagar deste mês foram encontradas no extrato.
             </p>
 
-            <div className="grid gap-1.5">
+            <div className="grid gap-1.5 min-w-0">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Contas a Receber do mês</p>
               {data.recebiveis.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhuma conta a receber cadastrada para este mês.</p>
               ) : (
-                <div className="rounded-lg border border-border divide-y divide-border">
+                <div className="rounded-lg border border-border divide-y divide-border min-w-0">
                   {data.recebiveis.map((r) => (
-                    <div key={`${r.tipo}-${r.id}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                      <span className="flex items-center gap-2 min-w-0 flex-1">
-                        {r.encontradoNoExtrato ? (
-                          <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-                        ) : (
-                          <TriangleAlert className="h-4 w-4 text-amber-600 shrink-0" />
-                        )}
-                        <span className="truncate min-w-0">{r.descricao}</span>
-                      </span>
-                      <span className="tabular-nums font-medium shrink-0">{brl(r.valor)}</span>
-                    </div>
+                    <LinhaItem key={`${r.tipo}-${r.id}`} ok={r.encontradoNoExtrato} texto={r.descricao} valor={r.valor} />
                   ))}
                 </div>
               )}
@@ -169,20 +185,43 @@ function ConciliacaoDialog({ ano, mes, onOpenChange }: { ano: number; mes: numbe
             </div>
 
             {data.entradasSemLancamento.length > 0 && (
-              <div className="grid gap-1.5">
+              <div className="grid gap-1.5 min-w-0">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Entradas no extrato sem conta a receber correspondente</p>
-                <div className="rounded-lg border border-border divide-y divide-border">
+                <div className="rounded-lg border border-border divide-y divide-border min-w-0">
                   {data.entradasSemLancamento.map((e, i) => (
-                    <div key={i} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                      <span className="flex items-center gap-2 min-w-0 flex-1">
-                        <HelpCircle className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <span className="truncate min-w-0">{e.descricao || "—"} · {formatDate(e.data)}</span>
-                      </span>
-                      <span className="tabular-nums font-medium shrink-0">{brl(e.valor)}</span>
-                    </div>
+                    <LinhaSemLancamento key={i} texto={`${e.descricao || "—"} · ${formatDate(e.data)}`} valor={e.valor} />
                   ))}
                 </div>
                 <p className="text-xs text-muted-foreground">Dinheiro que entrou na conta mas não bate com nenhuma parcela cadastrada — vale conferir se é aluguel sem lançamento, ou outra receita/aporte.</p>
+              </div>
+            )}
+
+            <div className="grid gap-1.5 min-w-0">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Contas a Pagar do mês</p>
+              {data.pagaveis.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma conta a pagar cadastrada para este mês.</p>
+              ) : (
+                <div className="rounded-lg border border-border divide-y divide-border min-w-0">
+                  {data.pagaveis.map((p) => (
+                    <LinhaItem key={`${p.tipo}-${p.id}`} ok={p.encontradoNoExtrato} texto={p.descricao} valor={p.valor} />
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                <TriangleAlert className="inline h-3 w-3 mr-1 text-amber-600" />
+                não achei uma saída de mesmo valor no extrato — pode não ter sido paga ainda, ou ter caído com valor diferente.
+              </p>
+            </div>
+
+            {data.saidasSemLancamento.length > 0 && (
+              <div className="grid gap-1.5 min-w-0">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Saídas no extrato sem conta a pagar correspondente</p>
+                <div className="rounded-lg border border-border divide-y divide-border min-w-0">
+                  {data.saidasSemLancamento.map((s, i) => (
+                    <LinhaSemLancamento key={i} texto={`${s.descricao || "—"} · ${formatDate(s.data)}`} valor={s.valor} />
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">Dinheiro que saiu da conta mas não bate com nenhuma conta a pagar cadastrada — vale conferir se é despesa sem lançamento, ou outro pagamento.</p>
               </div>
             )}
           </div>
