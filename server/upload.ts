@@ -658,4 +658,50 @@ export function registerUploadRoutes(app: Express) {
       res.status(500).json({ error: error.message || "Erro ao fazer upload do comprovante." });
     }
   });
+
+  /**
+   * POST /api/upload/extrato
+   * Body: multipart/form-data with field "file" (PDF ou imagem), "ano" e "mes" (number)
+   * Extrato mensal geral da empresa (ex.: extrato bancário), um por mês/ano.
+   * Returns: { arquivoUrl, arquivoKey }
+   */
+  app.post("/api/upload/extrato", upload.single("file"), async (req: Request, res: Response) => {
+    try {
+      const ctx = await resolverContexto(req, res);
+      if (!ctx) return;
+      if (!ctx.podeEscrever) {
+        res.status(403).json({ error: "Seu acesso nesta empresa não permite anexar extratos." });
+        return;
+      }
+
+      const ano = Number(req.body.ano);
+      const mes = Number(req.body.mes);
+      if (!ano || !mes || mes < 1 || mes > 12) {
+        res.status(400).json({ error: "ano e mes são obrigatórios." });
+        return;
+      }
+
+      const file = req.file;
+      if (!file) {
+        res.status(400).json({ error: "Arquivo não enviado." });
+        return;
+      }
+
+      const ext = EXT_BY_MIME[file.mimetype];
+      if (!ext) {
+        res.status(400).json({ error: "Apenas PDF ou imagens (JPG, PNG, WEBP) são aceitos." });
+        return;
+      }
+
+      const relKey = `extratos/${ctx.ownerId}_${ano}_${String(mes).padStart(2, "0")}.${ext}`;
+      const { key, url } = await storagePut(relKey, file.buffer, file.mimetype);
+
+      await db.upsertStatementFile(ctx.ownerId, ano, mes, url, key);
+
+      res.json({ arquivoUrl: url, arquivoKey: key });
+    } catch (error: any) {
+      console.error("[Upload] Statement upload failed:", error);
+      res.status(500).json({ error: error.message || "Erro ao fazer upload do extrato." });
+    }
+  });
 }

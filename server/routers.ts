@@ -939,6 +939,14 @@ export const appRouter = router({
       .mutation(({ ctx, input }) => db.updateLedgerCharge(ctx.ownerId, input.id, { status: "cancelado" })),
   }),
 
+  // --------------------------------------------------------- extratos (statements) da empresa
+  statements: router({
+    list: empresaProcedure.input(z.object({ ano: z.number().int() })).query(({ ctx, input }) => db.listStatements(ctx.ownerId, input.ano)),
+    delete: escritaProcedure
+      .input(z.object({ ano: z.number().int(), mes: z.number().int().min(1).max(12) }))
+      .mutation(({ ctx, input }) => db.deleteStatement(ctx.ownerId, input.ano, input.mes)),
+  }),
+
   // --------------------------------------------------------- guarantee types
   guaranteeTypes: router({
     list: empresaProcedure.query(({ ctx }) => db.seedDefaultGuaranteeTypesIfNeeded(ctx.ownerId)),

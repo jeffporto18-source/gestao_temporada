@@ -8,6 +8,7 @@ import DashboardLayout from "./components/DashboardLayout";
 import Login from "./pages/Login";
 import Cadastro from "./pages/Cadastro";
 import Painel from "./pages/Painel";
+import Extratos from "./pages/Extratos";
 import Clientes from "./pages/Clientes";
 import Imoveis from "./pages/Imoveis";
 import Imobiliarias from "./pages/Imobiliarias";
@@ -104,6 +105,11 @@ function App() {
             <Route path="/app">
               <RequireAuth>
                 <DashboardLayout><Painel /></DashboardLayout>
+              </RequireAuth>
+            </Route>
+            <Route path="/extratos">
+              <RequireAuth>
+                <DashboardLayout><Extratos /></DashboardLayout>
               </RequireAuth>
             </Route>
             <Route path="/clientes">

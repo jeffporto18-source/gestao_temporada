@@ -344,6 +344,13 @@
       "when": 1786831021121,
       "tag": "0048_reajustes_valores_json",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "5",
+      "when": 1786831081121,
+      "tag": "0049_add_statements",
+      "breakpoints": true
     }
   ]
 }

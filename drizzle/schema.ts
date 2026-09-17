@@ -571,3 +571,27 @@ export const contractRentCharges = mysqlTable("contract_rent_charges", {
 
 export type ContractRentCharge = typeof contractRentCharges.$inferSelect;
 export type InsertContractRentCharge = typeof contractRentCharges.$inferInsert;
+
+/**
+ * Extratos mensais da empresa (ex.: extrato bancário) — um anexo por mês/ano, geral, não
+ * vinculado a nenhum imóvel específico. Fica sempre visível no menu para consulta.
+ */
+export const statements = mysqlTable(
+  "statements",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    ownerId: int("ownerId").notNull(),
+    ano: int("ano").notNull(),
+    mes: int("mes").notNull(), // 1-12
+    arquivoUrl: varchar("arquivoUrl", { length: 500 }),
+    arquivoKey: varchar("arquivoKey", { length: 255 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (t) => ({
+    ownerAnoMesUnico: unique("statements_owner_ano_mes").on(t.ownerId, t.ano, t.mes),
+  }),
+);
+
+export type Statement = typeof statements.$inferSelect;
+export type InsertStatement = typeof statements.$inferInsert;

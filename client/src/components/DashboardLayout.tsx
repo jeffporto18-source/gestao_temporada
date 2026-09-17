@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, Building2, Receipt, BookOpen, CalendarDays, FileText, BarChart3, Upload, UserCog, UsersRound, Landmark, UserCog2, FileSignature, Package, Wallet, TrendingUp, Truck, PieChart, ClipboardList, ClipboardCheck, ScrollText, UserRound, ShieldCheck, Banknote } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, Building2, Receipt, BookOpen, CalendarDays, FileText, BarChart3, Upload, UserCog, UsersRound, Landmark, UserCog2, FileSignature, Package, Wallet, TrendingUp, Truck, PieChart, ClipboardList, ClipboardCheck, ScrollText, UserRound, ShieldCheck, Banknote, Archive } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -33,6 +33,7 @@ import { NIVEL_ROTULO } from "./RequireEmpresa";
 
 const allMenuItems = [
   { icon: LayoutDashboard, label: "Painel", path: "/app", hideFor: [] as string[] },
+  { icon: Archive, label: "Extratos", path: "/extratos", hideFor: [] as string[] },
   { icon: Users, label: "Clientes", path: "/clientes", hideFor: ["holding"] },
   { icon: Building2, label: "Cadastrar Imóveis", path: "/imoveis", hideFor: [] as string[] },
   { icon: Landmark, label: "Imobiliárias", path: "/imobiliarias", hideFor: [] as string[] },

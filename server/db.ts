@@ -45,6 +45,8 @@ import {
   NivelAcesso,
   LongTermContract,
   CostResponsibility,
+  statements,
+  InsertStatement,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -1106,4 +1108,37 @@ export async function updateContractRentCharge(ownerId: number, id: number, data
 export async function deleteContractRentCharge(ownerId: number, id: number) {
   const db = await requireDb();
   await db.delete(contractRentCharges).where(and(eq(contractRentCharges.ownerId, ownerId), eq(contractRentCharges.id, id)));
+}
+
+// ----------------------------------------------------------- extratos (statements) da empresa
+export async function listStatements(ownerId: number, ano: number) {
+  const db = await requireDb();
+  return db.select().from(statements).where(and(eq(statements.ownerId, ownerId), eq(statements.ano, ano)));
+}
+
+export async function getStatement(ownerId: number, ano: number, mes: number) {
+  const db = await requireDb();
+  const [row] = await db
+    .select()
+    .from(statements)
+    .where(and(eq(statements.ownerId, ownerId), eq(statements.ano, ano), eq(statements.mes, mes)))
+    .limit(1);
+  return row;
+}
+
+/** Cria ou substitui o anexo do mês/ano — um extrato por mês, então reenviar troca o arquivo. */
+export async function upsertStatementFile(ownerId: number, ano: number, mes: number, arquivoUrl: string, arquivoKey: string) {
+  const db = await requireDb();
+  const existente = await getStatement(ownerId, ano, mes);
+  if (existente) {
+    await db.update(statements).set({ arquivoUrl, arquivoKey }).where(eq(statements.id, existente.id));
+    return existente.id;
+  }
+  const res = await db.insert(statements).values({ ownerId, ano, mes, arquivoUrl, arquivoKey } satisfies InsertStatement);
+  return (res as unknown as { insertId: number }[])[0]?.insertId ?? (res as unknown as { insertId: number }).insertId;
+}
+
+export async function deleteStatement(ownerId: number, ano: number, mes: number) {
+  const db = await requireDb();
+  await db.delete(statements).where(and(eq(statements.ownerId, ownerId), eq(statements.ano, ano), eq(statements.mes, mes)));
 }
