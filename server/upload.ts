@@ -661,10 +661,16 @@ export function registerUploadRoutes(app: Express) {
 
   /**
    * POST /api/upload/extrato
-   * Body: multipart/form-data with field "file" (PDF ou imagem), "ano" e "mes" (number)
+   * Body: multipart/form-data with field "file" (PDF, imagem ou planilha Excel), "ano" e "mes" (number)
    * Extrato mensal geral da empresa (ex.: extrato bancário), um por mês/ano.
    * Returns: { arquivoUrl, arquivoKey }
    */
+  const EXT_BY_MIME_EXTRATO: Record<string, string> = {
+    ...EXT_BY_MIME,
+    "application/vnd.ms-excel": "xls",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  };
+
   app.post("/api/upload/extrato", upload.single("file"), async (req: Request, res: Response) => {
     try {
       const ctx = await resolverContexto(req, res);
@@ -687,9 +693,9 @@ export function registerUploadRoutes(app: Express) {
         return;
       }
 
-      const ext = EXT_BY_MIME[file.mimetype];
+      const ext = EXT_BY_MIME_EXTRATO[file.mimetype];
       if (!ext) {
-        res.status(400).json({ error: "Apenas PDF ou imagens (JPG, PNG, WEBP) são aceitos." });
+        res.status(400).json({ error: "Apenas PDF, imagens (JPG, PNG, WEBP) ou planilhas Excel (XLS, XLSX) são aceitos." });
         return;
       }
 

@@ -47,7 +47,7 @@ function AnexoMes({
         <input
           ref={inputRef}
           type="file"
-          accept="application/pdf,image/jpeg,image/png,image/webp"
+          accept="application/pdf,image/jpeg,image/png,image/webp,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,.xlsx"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
