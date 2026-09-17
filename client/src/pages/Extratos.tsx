@@ -124,7 +124,7 @@ function ConciliacaoDialog({ ano, mes, onOpenChange }: { ano: number; mes: numbe
 
   return (
     <Dialog open={mes !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="font-serif">
             Conciliação — {mes !== null ? MESES[mes - 1] : ""}/{ano}
@@ -149,13 +149,13 @@ function ConciliacaoDialog({ ano, mes, onOpenChange }: { ano: number; mes: numbe
                 <div className="rounded-lg border border-border divide-y divide-border">
                   {data.recebiveis.map((r) => (
                     <div key={`${r.tipo}-${r.id}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                      <span className="flex items-center gap-2 min-w-0">
+                      <span className="flex items-center gap-2 min-w-0 flex-1">
                         {r.encontradoNoExtrato ? (
                           <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
                         ) : (
                           <TriangleAlert className="h-4 w-4 text-amber-600 shrink-0" />
                         )}
-                        <span className="truncate">{r.descricao}</span>
+                        <span className="truncate min-w-0">{r.descricao}</span>
                       </span>
                       <span className="tabular-nums font-medium shrink-0">{brl(r.valor)}</span>
                     </div>
@@ -174,9 +174,9 @@ function ConciliacaoDialog({ ano, mes, onOpenChange }: { ano: number; mes: numbe
                 <div className="rounded-lg border border-border divide-y divide-border">
                   {data.entradasSemLancamento.map((e, i) => (
                     <div key={i} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                      <span className="flex items-center gap-2 min-w-0">
+                      <span className="flex items-center gap-2 min-w-0 flex-1">
                         <HelpCircle className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <span className="truncate">{e.descricao || "—"} · {formatDate(e.data)}</span>
+                        <span className="truncate min-w-0">{e.descricao || "—"} · {formatDate(e.data)}</span>
                       </span>
                       <span className="tabular-nums font-medium shrink-0">{brl(e.valor)}</span>
                     </div>
