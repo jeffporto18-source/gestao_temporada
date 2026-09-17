@@ -1,7 +1,11 @@
 // Conciliação bancária: lê os créditos (entradas) de um extrato em planilha Excel anexado em
 // Extratos e casa cada um, por valor, com as parcelas de Contas a Receber do mês (lançamentos
-// manuais de receita + parcelas de contrato de longa duração), para apontar o que está faltando
-// lançar e o que entrou no banco sem lançamento correspondente.
+// manuais de receita, parcelas de contrato de longa duração e reservas de curta temporada), para
+// apontar o que está faltando lançar e o que entrou no banco sem lançamento correspondente.
+//
+// Reservas de curta temporada (Airbnb) usam o VALOR LÍQUIDO recebido (após taxas do Airbnb), não o
+// valor bruto lançado no plano de contas — é o líquido que efetivamente cai na conta, então é ele
+// que precisa bater com o extrato.
 
 import * as XLSX from "xlsx";
 import * as db from "./db";
@@ -87,7 +91,7 @@ function lerEntradasDoExtrato(buffer: Buffer): MovimentoExtrato[] {
 }
 
 export interface ItemConciliacao {
-  tipo: "ledger" | "contrato";
+  tipo: "ledger" | "contrato" | "reserva";
   id: number;
   descricao: string;
   valor: number;
@@ -117,15 +121,20 @@ export async function conciliarExtratoContasAReceber(ownerId: number, ano: numbe
 
   const competencia = `${ano}-${String(mes).padStart(2, "0")}`;
 
-  const [ledgerCharges, contratosCharges, contratos, properties] = await Promise.all([
+  const [ledgerCharges, contratosCharges, contratos, properties, reservasPorCheckin, reservasPorRecebimento] = await Promise.all([
     db.listLedgerCharges(ownerId, { grupo: "receita" }),
     db.listContractRentChargesByCompetencia(ownerId, competencia),
     db.listLongTermContracts(ownerId),
     db.listProperties(ownerId),
+    db.listReservations(ownerId, undefined, competencia),
+    db.listReservationsRecebidasNaCompetencia(ownerId, competencia),
   ]);
 
   const contratoPorId = new Map(contratos.map((c) => [c.id, c]));
   const propriedadePorId = new Map(properties.map((p) => [p.id, p]));
+  // Uma reserva pode ter check-in num mês e o repasse do Airbnb cair no seguinte — junta as duas
+  // buscas (por competência do check-in e por competência do recebimento já confirmado) sem duplicar.
+  const reservasDoMes = Array.from(new Map([...reservasPorCheckin, ...reservasPorRecebimento].map((r) => [r.id, r])).values());
 
   const receitasDoMes = ledgerCharges.filter((c) => c.competencia === competencia && c.status !== "cancelado");
 
@@ -153,6 +162,18 @@ export async function conciliarExtratoContasAReceber(ownerId: number, ano: numbe
           encontradoNoExtrato: false,
         };
       }),
+    ...reservasDoMes.map((r) => {
+      const prop = propriedadePorId.get(r.propertyId);
+      return {
+        tipo: "reserva" as const,
+        id: r.id,
+        descricao: `Airbnb — ${prop?.apelido ?? "Imóvel"} (${r.codigo}${r.nomeHospede ? ` · ${r.nomeHospede}` : ""})`,
+        valor: round2(r.dataRecebimento ? num(r.valorRecebido ?? r.valorLiquidoRecebido) : num(r.valorLiquidoRecebido)),
+        data: r.dataRecebimento || r.checkin,
+        status: r.dataRecebimento ? "recebido" : "pendente",
+        encontradoNoExtrato: false,
+      };
+    }),
   ];
 
   // Casa cada recebível com UMA entrada de mesmo valor no extrato (multiset: uma entrada só cobre
