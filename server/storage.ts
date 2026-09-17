@@ -60,3 +60,12 @@ export async function getPresignedUrl(relKey: string, expiresInSeconds = 300): P
     { expiresIn: expiresInSeconds },
   );
 }
+
+/** Baixa o conteúdo bruto de um objeto (ex.: para ler uma planilha anexada, no servidor). */
+export async function storageGetBuffer(relKey: string): Promise<Buffer> {
+  const key = normalizeKey(relKey);
+  const res = await requireClient().send(new GetObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key }));
+  const bytes = await res.Body?.transformToByteArray();
+  if (!bytes) throw new Error("Arquivo vazio ou não encontrado.");
+  return Buffer.from(bytes);
+}

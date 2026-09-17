@@ -9,9 +9,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { Upload, ExternalLink, Loader2, Trash2 } from "lucide-react";
+import { Upload, ExternalLink, Loader2, Trash2, ListChecks, CheckCircle2, TriangleAlert, HelpCircle } from "lucide-react";
+import { brl, formatDate } from "@/lib/format";
 import { PageHeader } from "./Clientes";
 
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -27,19 +34,24 @@ function anosDisponiveis(): number[] {
 function AnexoMes({
   mes,
   url,
+  arquivoKey,
   uploading,
   onUpload,
   onRemove,
+  onConciliar,
   removing,
 }: {
   mes: string;
   url?: string | null;
+  arquivoKey?: string | null;
   uploading: boolean;
   onUpload: (file: File) => void;
   onRemove: () => void;
+  onConciliar: () => void;
   removing: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const ehPlanilha = !!arquivoKey && /\.xlsx?$/i.test(arquivoKey);
   return (
     <div className="flex items-center justify-between gap-3 px-4 py-3">
       <span className="text-sm font-medium w-28 shrink-0">{mes}</span>
@@ -55,6 +67,17 @@ function AnexoMes({
             e.target.value = "";
           }}
         />
+        {ehPlanilha && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs bg-background text-muted-foreground hover:text-primary"
+            onClick={onConciliar}
+            title="Conferir se todas as parcelas de Contas a Receber deste mês estão no extrato"
+          >
+            <ListChecks className="mr-1 h-3.5 w-3.5" /> Conciliar
+          </Button>
+        )}
         {url && (
           <Button
             size="sm"
@@ -92,12 +115,90 @@ function AnexoMes({
   );
 }
 
+/** Resultado da conciliação de um mês: parcelas de Contas a Receber casadas por valor com os créditos do extrato. */
+function ConciliacaoDialog({ ano, mes, onOpenChange }: { ano: number; mes: number | null; onOpenChange: (open: boolean) => void }) {
+  const { data, isLoading, error } = trpc.statements.conciliar.useQuery(
+    { ano, mes: mes ?? 1 },
+    { enabled: mes !== null },
+  );
+
+  return (
+    <Dialog open={mes !== null} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="font-serif">
+            Conciliação — {mes !== null ? MESES[mes - 1] : ""}/{ano}
+          </DialogTitle>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="h-40 rounded-xl border border-border bg-card animate-pulse" />
+        ) : error ? (
+          <p className="text-sm text-destructive py-4">{error.message}</p>
+        ) : !data ? null : (
+          <div className="grid gap-4">
+            <p className="text-sm text-muted-foreground">
+              {data.totalConciliados} de {data.totalRecebiveis} contas a receber deste mês foram encontradas no extrato.
+            </p>
+
+            <div className="grid gap-1.5">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Contas a Receber do mês</p>
+              {data.recebiveis.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma conta a receber cadastrada para este mês.</p>
+              ) : (
+                <div className="rounded-lg border border-border divide-y divide-border">
+                  {data.recebiveis.map((r) => (
+                    <div key={`${r.tipo}-${r.id}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                      <span className="flex items-center gap-2 min-w-0">
+                        {r.encontradoNoExtrato ? (
+                          <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                        ) : (
+                          <TriangleAlert className="h-4 w-4 text-amber-600 shrink-0" />
+                        )}
+                        <span className="truncate">{r.descricao}</span>
+                      </span>
+                      <span className="tabular-nums font-medium shrink-0">{brl(r.valor)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                <TriangleAlert className="inline h-3 w-3 mr-1 text-amber-600" />
+                não achei uma entrada de mesmo valor no extrato — pode não ter sido pago ainda, ou ter caído com valor diferente.
+              </p>
+            </div>
+
+            {data.entradasSemLancamento.length > 0 && (
+              <div className="grid gap-1.5">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Entradas no extrato sem conta a receber correspondente</p>
+                <div className="rounded-lg border border-border divide-y divide-border">
+                  {data.entradasSemLancamento.map((e, i) => (
+                    <div key={i} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                      <span className="flex items-center gap-2 min-w-0">
+                        <HelpCircle className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="truncate">{e.descricao || "—"} · {formatDate(e.data)}</span>
+                      </span>
+                      <span className="tabular-nums font-medium shrink-0">{brl(e.valor)}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">Dinheiro que entrou na conta mas não bate com nenhuma parcela cadastrada — vale conferir se é aluguel sem lançamento, ou outra receita/aporte.</p>
+              </div>
+            )}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /** Extratos mensais gerais da empresa (ex.: extrato bancário) — sempre visível no menu, para consulta rápida. */
 export default function Extratos() {
   const utils = trpc.useUtils();
   const hoje = new Date();
   const [ano, setAno] = useState(hoje.getFullYear());
   const [uploadingMes, setUploadingMes] = useState<number | null>(null);
+  const [conciliandoMes, setConciliandoMes] = useState<number | null>(null);
 
   const { data: extratos, isLoading } = trpc.statements.list.useQuery({ ano });
   const porMes = new Map((extratos ?? []).map((e) => [e.mes, e]));
@@ -159,9 +260,11 @@ export default function Extratos() {
                   key={mes}
                   mes={nome}
                   url={extrato?.arquivoUrl}
+                  arquivoKey={extrato?.arquivoKey}
                   uploading={uploadingMes === mes}
                   onUpload={(file) => upload(mes, file)}
                   onRemove={() => remove.mutate({ ano, mes })}
+                  onConciliar={() => setConciliandoMes(mes)}
                   removing={remove.isPending}
                 />
               );
@@ -169,6 +272,8 @@ export default function Extratos() {
           </div>
         </Card>
       )}
+
+      <ConciliacaoDialog ano={ano} mes={conciliandoMes} onOpenChange={(open) => !open && setConciliandoMes(null)} />
     </div>
   );
 }

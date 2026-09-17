@@ -8,6 +8,7 @@ import { empresaProcedure, escritaProcedure, financeiroProcedure, TENANT_COOKIE 
 import { NIVEIS_ACESSO } from "../drizzle/schema";
 import * as db from "./db";
 import { processarOperacao, emitirNfse, COD_LOCACAO, COD_INTERMEDIACAO } from "./fiscal";
+import { conciliarExtratoContasAReceber } from "./conciliacao";
 import { ENV } from "./_core/env";
 
 // Plano de contas (chart_accounts): árvore de profundidade livre. Contas principais
@@ -945,6 +946,10 @@ export const appRouter = router({
     delete: escritaProcedure
       .input(z.object({ ano: z.number().int(), mes: z.number().int().min(1).max(12) }))
       .mutation(({ ctx, input }) => db.deleteStatement(ctx.ownerId, input.ano, input.mes)),
+    // Concilia o extrato (planilha Excel) anexado no mês com as Contas a Receber da mesma competência.
+    conciliar: empresaProcedure
+      .input(z.object({ ano: z.number().int(), mes: z.number().int().min(1).max(12) }))
+      .query(({ ctx, input }) => conciliarExtratoContasAReceber(ctx.ownerId, input.ano, input.mes)),
   }),
 
   // --------------------------------------------------------- guarantee types
