@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { Upload, ExternalLink, Loader2, Trash2, ListChecks, CheckCircle2, TriangleAlert, HelpCircle } from "lucide-react";
+import { Upload, ExternalLink, Loader2, Trash2, ListChecks, CheckCircle2, TriangleAlert, HelpCircle, Printer } from "lucide-react";
 import { brl, formatDate } from "@/lib/format";
 import { PageHeader } from "./Clientes";
 
@@ -150,12 +150,20 @@ function ConciliacaoDialog({ ano, mes, onOpenChange }: { ano: number; mes: numbe
 
   return (
     <Dialog open={mes !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto min-w-0">
-        <DialogHeader>
+      <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto min-w-0 print:static print:w-full print:max-w-none print:max-h-none print:overflow-visible print:shadow-none print:border-0 print:translate-x-0 print:translate-y-0">
+        <DialogHeader className="flex-row items-center justify-between gap-3 print:hidden">
           <DialogTitle className="font-serif">
             Conciliação — {mes !== null ? MESES[mes - 1] : ""}/{ano}
           </DialogTitle>
+          {data && (
+            <Button variant="outline" size="sm" className="bg-background shrink-0" onClick={() => window.print()}>
+              <Printer className="mr-1.5 h-3.5 w-3.5" /> Imprimir PDF
+            </Button>
+          )}
         </DialogHeader>
+        <div className="hidden print:block">
+          <h2 className="text-base font-serif font-bold">Conciliação — {mes !== null ? MESES[mes - 1] : ""}/{ano}</h2>
+        </div>
 
         {isLoading ? (
           <div className="h-40 rounded-xl border border-border bg-card animate-pulse" />
@@ -267,7 +275,7 @@ export default function Extratos() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto print:hidden">
       <PageHeader
         title="Extratos"
         subtitle="Um anexo por mês, geral da empresa — sempre disponível aqui para consulta e para tirar dúvidas."
