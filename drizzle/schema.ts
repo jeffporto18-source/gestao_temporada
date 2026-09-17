@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, unique, varchar, decimal, date } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, unique, varchar, decimal, date, json } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow (administradora / usuário do SaaS).
@@ -468,10 +468,11 @@ export const longTermContracts = mysqlTable("long_term_contracts", {
   dataInicio: date("dataInicio", { mode: "string" }).notNull(),
   dataFim: date("dataFim", { mode: "string" }).notNull(),
   dataReajuste: date("dataReajuste", { mode: "string" }),
-  // Valor do aluguel após o 1º e o 2º reajuste, preenchido manualmente (o índice de correção real
-  // só é conhecido na data do reajuste, não dá pra calcular automaticamente no cadastro).
-  valorReajuste1: decimal("valorReajuste1", { precision: 12, scale: 2 }),
-  valorReajuste2: decimal("valorReajuste2", { precision: 12, scale: 2 }),
+  // Valor do aluguel a partir de CADA data de reajuste (uma por ano de contrato, calculadas a
+  // partir de dataInicio), preenchido manualmente — o índice de correção real só é conhecido na
+  // data do reajuste, não dá pra calcular automaticamente no cadastro. Ao salvar, os valores são
+  // aplicados às parcelas (contract_rent_charges) ainda pendentes a partir de cada data.
+  reajustesValores: json("reajustesValores").$type<{ data: string; valor: number }[]>(),
   indiceCorrecao: varchar("indiceCorrecao", { length: 50 }).notNull().default("IGPM"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

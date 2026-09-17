@@ -301,6 +301,16 @@ export async function deleteLedgerEntriesByContractRentCharge(ownerId: number, c
   await db.delete(ledgerEntries).where(and(eq(ledgerEntries.ownerId, ownerId), eq(ledgerEntries.contractRentChargeId, contractRentChargeId)));
 }
 
+export async function getLedgerEntryByContractRentCharge(ownerId: number, contractRentChargeId: number) {
+  const db = await requireDb();
+  const [entry] = await db
+    .select()
+    .from(ledgerEntries)
+    .where(and(eq(ledgerEntries.ownerId, ownerId), eq(ledgerEntries.contractRentChargeId, contractRentChargeId)))
+    .limit(1);
+  return entry;
+}
+
 // ---------------------------------------------------------- reservations
 export async function listReservations(ownerId: number, propertyId?: number, competencia?: string) {
   const db = await requireDb();

@@ -205,6 +205,36 @@ function addMonthsToDate(data: string, months: number): string {
   return `${ny}-${String(nm).padStart(2, "0")}-${String(diaAjustado).padStart(2, "0")}`;
 }
 
+/**
+ * Aplica os valores de reajuste às parcelas (contract_rent_charges) do contrato: cada reajuste
+ * vigora da sua competência (mês/ano da data) até a véspera do próximo reajuste, ou até o fim do
+ * contrato se for o último. Só altera parcelas ainda "pendente" — o que já foi recebido fica
+ * registrado com o valor histórico, nunca é reescrito. O lançamento automático de receita vinculado
+ * a cada parcela alterada é atualizado junto, para o Relatório e a DRE baterem com a parcela.
+ */
+async function aplicarReajustesNasParcelas(ownerId: number, contractId: number, reajustes: { data: string; valor: number }[]) {
+  if (reajustes.length === 0) return;
+  const ordenados = [...reajustes].sort((a, b) => a.data.localeCompare(b.data));
+  const parcelas = await db.listContractRentCharges(ownerId, contractId);
+
+  for (let i = 0; i < ordenados.length; i++) {
+    const competenciaInicio = ordenados[i].data.slice(0, 7);
+    const competenciaFim = i + 1 < ordenados.length ? ordenados[i + 1].data.slice(0, 7) : null; // null = até o fim do contrato
+    const novoValor = round2(ordenados[i].valor);
+
+    for (const parcela of parcelas) {
+      if (parcela.status !== "pendente") continue;
+      if (parcela.competencia < competenciaInicio) continue;
+      if (competenciaFim !== null && parcela.competencia >= competenciaFim) continue;
+      if (num(parcela.valor) === novoValor) continue;
+
+      await db.updateContractRentCharge(ownerId, parcela.id, { valor: String(novoValor) });
+      const ledgerEntry = await db.getLedgerEntryByContractRentCharge(ownerId, parcela.id);
+      if (ledgerEntry) await db.updateLedgerEntry(ownerId, ledgerEntry.id, { valor: String(novoValor) });
+    }
+  }
+}
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -1148,8 +1178,7 @@ export const appRouter = router({
           tipoAdministracao: z.enum(["propria", "administradora", "gestor_curta_temporada"]).default("propria"),
           imobiliariaId: z.number().optional(),
           valorAluguel: z.number().positive(),
-          valorReajuste1: z.number().positive().optional(),
-          valorReajuste2: z.number().positive().optional(),
+          reajustesValores: z.array(z.object({ data: z.string(), valor: z.number().positive() })).optional(),
           renovacaoAutomatica: z.enum(["novo_contrato", "prazo_indeterminado"]).optional(),
           prazoIndeterminadoDataInicio: z.string().optional(),
           prazoIndeterminadoValor: z.number().positive().optional(),
@@ -1182,8 +1211,7 @@ export const appRouter = router({
           dataInicio: rest.dataInicio,
           dataFim,
           dataReajuste,
-          valorReajuste1: rest.valorReajuste1 !== undefined ? String(rest.valorReajuste1) : null,
-          valorReajuste2: rest.valorReajuste2 !== undefined ? String(rest.valorReajuste2) : null,
+          reajustesValores: rest.reajustesValores ?? null,
           indiceCorrecao: rest.indiceCorrecao,
           nomeInquilino: rest.nomeInquilino || null,
           cpfCnpjInquilino: rest.cpfCnpjInquilino || null,
@@ -1262,6 +1290,10 @@ export const appRouter = router({
           });
         }
 
+        if (rest.reajustesValores?.length) {
+          await aplicarReajustesNasParcelas(ctx.ownerId, contractId, rest.reajustesValores);
+        }
+
         // O contrato acabou de definir quem paga condomínio/IPTU nos meses que ele cobre, então os
         // custos já cadastrados no imóvel podem ter trocado de dono.
         await sincronizarCustosDoImovel(ctx.ownerId, rest.propertyId);
@@ -1280,8 +1312,7 @@ export const appRouter = router({
           dataInicio: z.string().optional(),
           dataFim: z.string().optional(),
           dataReajuste: z.string().optional(),
-          valorReajuste1: z.number().positive().nullable().optional(),
-          valorReajuste2: z.number().positive().nullable().optional(),
+          reajustesValores: z.array(z.object({ data: z.string(), valor: z.number().positive() })).nullable().optional(),
           indiceCorrecao: z.string().optional(),
           nomeInquilino: z.string().optional(),
           cpfCnpjInquilino: z.string().optional(),
@@ -1312,7 +1343,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const {
           id, dataInicio, dataFim, dataReajuste, carenciaInicio, carenciaFim, comissaoPct, prazoIndeterminadoValor, imobiliariaId,
-          renovacaoNovoContratoDataInicio, renovacaoNovoContratoPrazoMeses, renovacaoNovoContratoValor, valorReajuste1, valorReajuste2, ...rest
+          renovacaoNovoContratoDataInicio, renovacaoNovoContratoPrazoMeses, renovacaoNovoContratoValor, reajustesValores, ...rest
         } = input;
         const contrato = await db.getLongTermContract(ctx.ownerId, id);
         // Recalcula fim/reajuste do novo contrato da renovação sempre que início ou prazo mudam,
@@ -1324,8 +1355,7 @@ export const appRouter = router({
           ...(comissaoPct !== undefined ? { comissaoPct: String(comissaoPct) } : {}),
           ...(prazoIndeterminadoValor !== undefined ? { prazoIndeterminadoValor: prazoIndeterminadoValor !== null ? String(prazoIndeterminadoValor) : null } : {}),
           ...(renovacaoNovoContratoValor !== undefined ? { renovacaoNovoContratoValor: renovacaoNovoContratoValor !== null ? String(renovacaoNovoContratoValor) : null } : {}),
-          ...(valorReajuste1 !== undefined ? { valorReajuste1: valorReajuste1 !== null ? String(valorReajuste1) : null } : {}),
-          ...(valorReajuste2 !== undefined ? { valorReajuste2: valorReajuste2 !== null ? String(valorReajuste2) : null } : {}),
+          ...(reajustesValores !== undefined ? { reajustesValores } : {}),
           ...(imobiliariaId !== undefined
             ? { imobiliariaId: (rest.tipoAdministracao ?? contrato?.tipoAdministracao) === "administradora" ? imobiliariaId : null }
             : {}),
@@ -1343,6 +1373,9 @@ export const appRouter = router({
               }
             : {}),
         });
+        if (reajustesValores?.length) {
+          await aplicarReajustesNasParcelas(ctx.ownerId, id, reajustesValores);
+        }
         // Vigência e responsabilidade podem ter mudado, e ambas alteram quem paga cada custo.
         if (contrato) await sincronizarCustosDoImovel(ctx.ownerId, contrato.propertyId);
       }),
