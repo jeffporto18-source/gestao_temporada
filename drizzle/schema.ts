@@ -137,6 +137,11 @@ export const properties = mysqlTable("properties", {
   socioId: int("socioId"),
   socio2Id: int("socio2Id"),
   socio3Id: int("socio3Id"),
+  // Quem paga condomínio/IPTU quando NENHUM contrato de longa duração cobre o mês (imóvel vago, ou
+  // sem contrato formal — comum em imóvel de holding). Quando há contrato, o campo do CONTRATO
+  // (condominioPor/iptuPor) manda; este é só o padrão usado na ausência dele.
+  condominioPorPadrao: mysqlEnum("condominioPorPadrao", ["proprietario", "inquilino_direto"]).notNull().default("proprietario"),
+  iptuPorPadrao: mysqlEnum("iptuPorPadrao", ["proprietario", "inquilino_direto"]).notNull().default("proprietario"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -214,7 +219,11 @@ export type InsertLedgerEntry = typeof ledgerEntries.$inferInsert;
 export const ledgerCharges = mysqlTable("ledger_charges", {
   id: int("id").autoincrement().primaryKey(),
   ownerId: int("ownerId").notNull(),
-  ledgerEntryId: int("ledgerEntryId").notNull(),
+  // Nulo quando a parcela vem direto de um custo do imóvel (propertyCostId), sem lançamento em
+  // série intermediário — esse lançamento é reconstruído do zero a cada sincronização e não
+  // serviria como chave estável para preservar a baixa mês a mês.
+  ledgerEntryId: int("ledgerEntryId"),
+  propertyCostId: int("propertyCostId"),
   propertyId: int("propertyId"),
   grupo: mysqlEnum("grupo", ["despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao"]).notNull(),
   categoria: varchar("categoria", { length: 300 }),

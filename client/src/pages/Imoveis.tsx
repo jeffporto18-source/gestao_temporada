@@ -51,18 +51,25 @@ interface PropertyForm {
   socioId: string;
   socio2Id: string;
   socio3Id: string;
+  condominioPorPadrao: "proprietario" | "inquilino_direto";
+  iptuPorPadrao: "proprietario" | "inquilino_direto";
 }
 
 const emptyForm: PropertyForm = {
   clientId: "", apelido: "", endereco: "", comissao: "20", custoFaxina: "150", tipoLocacao: "curta",
   tipoAdministracao: "propria", imobiliariaId: "", gestorId: "", financiado: "nao", tipoFinanciamento: "financiamento", valorParcela: "",
-  socioId: "", socio2Id: "", socio3Id: "",
+  socioId: "", socio2Id: "", socio3Id: "", condominioPorPadrao: "proprietario", iptuPorPadrao: "proprietario",
 };
 
 const TIPO_ADMIN_LABELS: Record<PropertyForm["tipoAdministracao"], string> = {
   propria: "Direta (proprietário)",
   administradora: "Administradora",
   gestor_curta_temporada: "Gestor de temporada terceirizado",
+};
+
+const RESPONSAVEL_PADRAO_LABELS: Record<PropertyForm["condominioPorPadrao"], string> = {
+  proprietario: "Proprietário",
+  inquilino_direto: "Inquilino",
 };
 
 export default function Imoveis() {
@@ -118,6 +125,8 @@ export default function Imoveis() {
       socioId: p.socioId ? String(p.socioId) : "",
       socio2Id: p.socio2Id ? String(p.socio2Id) : "",
       socio3Id: p.socio3Id ? String(p.socio3Id) : "",
+      condominioPorPadrao: (p.condominioPorPadrao as PropertyForm["condominioPorPadrao"]) || "proprietario",
+      iptuPorPadrao: (p.iptuPorPadrao as PropertyForm["iptuPorPadrao"]) || "proprietario",
     });
     setOpen(true);
   };
@@ -146,6 +155,8 @@ export default function Imoveis() {
       socioId: form.tipoLocacao === "longa" && form.socioId ? Number(form.socioId) : undefined,
       socio2Id: form.tipoLocacao === "longa" && form.socio2Id ? Number(form.socio2Id) : undefined,
       socio3Id: form.tipoLocacao === "longa" && form.socio3Id ? Number(form.socio3Id) : undefined,
+      condominioPorPadrao: form.condominioPorPadrao,
+      iptuPorPadrao: form.iptuPorPadrao,
     };
     if (editId) {
       update.mutate({
@@ -344,6 +355,45 @@ export default function Imoveis() {
                 <div className="grid gap-1.5">
                   <Label>Endereço</Label>
                   <Input value={form.endereco} onChange={(e) => setForm({ ...form, endereco: e.target.value })} />
+                </div>
+
+                <div className="rounded-md border p-3">
+                  <p className="text-sm font-medium">Condomínio e IPTU — padrão do imóvel</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Usado quando não há contrato de locação cobrindo o mês. Quando pago pelo proprietário, entra em
+                    Contas a Pagar e na DRE; quando pago pelo inquilino, não entra em nenhum dos dois. Com contrato
+                    ativo, o que estiver definido nele manda.
+                  </p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-1.5">
+                      <Label>Condomínio pago por</Label>
+                      <Select
+                        value={form.condominioPorPadrao}
+                        onValueChange={(v) => setForm({ ...form, condominioPorPadrao: v as PropertyForm["condominioPorPadrao"] })}
+                      >
+                        <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(RESPONSAVEL_PADRAO_LABELS).map(([v, label]) => (
+                            <SelectItem key={v} value={v}>{label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label>IPTU pago por</Label>
+                      <Select
+                        value={form.iptuPorPadrao}
+                        onValueChange={(v) => setForm({ ...form, iptuPorPadrao: v as PropertyForm["iptuPorPadrao"] })}
+                      >
+                        <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(RESPONSAVEL_PADRAO_LABELS).map(([v, label]) => (
+                            <SelectItem key={v} value={v}>{label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="grid gap-1.5">

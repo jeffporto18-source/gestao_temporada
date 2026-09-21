@@ -125,6 +125,8 @@ const costResponsibilitySchema = z.enum(["proprietario", "inquilino_direto", "in
  * (competenciaInicio + qtdMeses), no idioma que o razão já usa, em vez de um lançamento por mês.
  */
 async function sincronizarCustosDoImovel(ownerId: number, propertyId: number) {
+  const imovel = await db.getProperty(ownerId, propertyId);
+  if (!imovel) return;
   const custos = await db.listPropertyCosts(ownerId, propertyId);
   const contratos = await db.listLongTermContracts(ownerId, propertyId);
   const parcelas = await db.listContractRentCharges(ownerId);
@@ -140,6 +142,7 @@ async function sincronizarCustosDoImovel(ownerId: number, propertyId: number) {
     const valor = num(custo.valor);
     let inicioDoTrecho: string | null = null;
     let mesesDoTrecho = 0;
+    const categoria = custo.tipo === "iptu" ? "IPTU" : "Condomínio";
 
     const gravarTrecho = async () => {
       if (!inicioDoTrecho || mesesDoTrecho === 0) return;
@@ -148,7 +151,7 @@ async function sincronizarCustosDoImovel(ownerId: number, propertyId: number) {
         propertyId,
         chartAccountId: null,
         grupo: "despesa_fixa",
-        categoria: custo.tipo === "iptu" ? "IPTU" : "Condomínio",
+        categoria,
         valor: String(valor),
         dia: custo.dia,
         competenciaInicio: inicioDoTrecho,
@@ -156,21 +159,53 @@ async function sincronizarCustosDoImovel(ownerId: number, propertyId: number) {
         descricao:
           custo.tipo === "condominio_extra"
             ? `Despesa automática — ${custo.descricao || "Rateio de condomínio"}`
-            : `Despesa automática — ${custo.tipo === "iptu" ? "IPTU" : "Condomínio"}`,
+            : `Despesa automática — ${categoria}`,
         propertyCostId: custo.id,
       });
       inicioDoTrecho = null;
       mesesDoTrecho = 0;
     };
 
+    // Ocorrências mensais com baixa própria em Contas a Pagar — paralelas ao lançamento em série
+    // acima, mas indexadas por (custo, competência) em vez de pelo lançamento (que é recriado do
+    // zero a cada sincronização): assim uma baixa e um comprovante já registrados sobrevivem mesmo
+    // quando o lançamento que os originou é reconstruído.
+    const chargesExistentes = await db.listLedgerCharges(ownerId, { propertyCostId: custo.id });
+    const competenciasComBaixa = new Set(chargesExistentes.filter((c) => c.status !== "aberto").map((c) => c.competencia));
+    const competenciasDoProprietario = new Set<string>();
+
     for (let i = 0; i < custo.qtdMeses; i++) {
       const competencia = addMonthsToCompetencia(custo.competenciaInicio, i);
       const contrato = contratos.find((c) => db.contratoCobreCompetencia(c, competencia)) ?? null;
-      const responsavel = db.responsavelPeloCusto(custo, contrato);
+      const responsavel = db.responsavelPeloCusto(custo, contrato, imovel);
 
       if (responsavel === "proprietario") {
         if (!inicioDoTrecho) inicioDoTrecho = competencia;
         mesesDoTrecho++;
+
+        competenciasDoProprietario.add(competencia);
+        if (!competenciasComBaixa.has(competencia)) {
+          const dataVencimento = calcularVencimento(competencia, custo.dia);
+          const emAberto = chargesExistentes.find((c) => c.competencia === competencia && c.status === "aberto");
+          if (emAberto) {
+            await db.updateLedgerCharge(ownerId, emAberto.id, { valor: String(valor), dataVencimento, categoria });
+          } else {
+            await db.createLedgerCharge({
+              ownerId,
+              propertyId,
+              propertyCostId: custo.id,
+              ledgerEntryId: null,
+              grupo: "despesa_fixa",
+              categoria,
+              descricao: custo.tipo === "condominio_extra" ? custo.descricao || "Rateio de condomínio" : null,
+              contraparte: null,
+              competencia,
+              dataVencimento,
+              valor: String(valor),
+              status: "aberto",
+            });
+          }
+        }
         continue;
       }
 
@@ -184,6 +219,13 @@ async function sincronizarCustosDoImovel(ownerId: number, propertyId: number) {
       }
     }
     await gravarTrecho();
+
+    // Meses em aberto que não são mais do proprietário (mudou responsável, ou saíram da série):
+    // removidos. Nunca mexe nos já pagos/cancelados, pra não perder a baixa nem o comprovante.
+    for (const charge of chargesExistentes) {
+      if (charge.status !== "aberto") continue;
+      if (!competenciasDoProprietario.has(charge.competencia)) await db.deleteLedgerCharge(ownerId, charge.id);
+    }
   }
 
   for (const parcela of parcelasDoImovel) {
@@ -644,6 +686,8 @@ export const appRouter = router({
           socioId: z.number().optional(),
           socio2Id: z.number().optional(),
           socio3Id: z.number().optional(),
+          condominioPorPadrao: z.enum(["proprietario", "inquilino_direto"]).default("proprietario"),
+          iptuPorPadrao: z.enum(["proprietario", "inquilino_direto"]).default("proprietario"),
         }),
       )
       .mutation(({ ctx, input }) =>
@@ -664,6 +708,8 @@ export const appRouter = router({
           socioId: input.socioId ?? null,
           socio2Id: input.socio2Id ?? null,
           socio3Id: input.socio3Id ?? null,
+          condominioPorPadrao: input.condominioPorPadrao,
+          iptuPorPadrao: input.iptuPorPadrao,
         }),
       ),
     update: escritaProcedure
@@ -685,16 +731,24 @@ export const appRouter = router({
           socioId: z.number().nullable().optional(),
           socio2Id: z.number().nullable().optional(),
           socio3Id: z.number().nullable().optional(),
+          condominioPorPadrao: z.enum(["proprietario", "inquilino_direto"]).optional(),
+          iptuPorPadrao: z.enum(["proprietario", "inquilino_direto"]).optional(),
         }),
       )
-      .mutation(({ ctx, input }) => {
-        const { id, comissaoPct, custoFaxina, valorParcela, ...rest } = input;
-        return db.updateProperty(ctx.ownerId, id, {
+      .mutation(async ({ ctx, input }) => {
+        const { id, comissaoPct, custoFaxina, valorParcela, condominioPorPadrao, iptuPorPadrao, ...rest } = input;
+        await db.updateProperty(ctx.ownerId, id, {
           ...rest,
           ...(comissaoPct !== undefined ? { comissaoPct: String(comissaoPct) } : {}),
           ...(custoFaxina !== undefined ? { custoFaxina: String(custoFaxina) } : {}),
           ...(valorParcela !== undefined ? { valorParcela: valorParcela !== null ? String(valorParcela) : null } : {}),
+          ...(condominioPorPadrao !== undefined ? { condominioPorPadrao } : {}),
+          ...(iptuPorPadrao !== undefined ? { iptuPorPadrao } : {}),
         });
+        // Muda quem paga condomínio/IPTU nos meses sem contrato — refaz o que depende disso.
+        if (condominioPorPadrao !== undefined || iptuPorPadrao !== undefined) {
+          await sincronizarCustosDoImovel(ctx.ownerId, id);
+        }
       }),
     delete: escritaProcedure.input(z.object({ id: z.number() })).mutation(({ ctx, input }) => db.deleteProperty(ctx.ownerId, input.id)),
   }),
@@ -1158,6 +1212,7 @@ export const appRouter = router({
       const atual = await db.getPropertyCost(ctx.ownerId, input.id);
       if (!atual) return;
       await db.deleteLedgerEntriesByPropertyCost(ctx.ownerId, input.id);
+      await db.deleteLedgerChargesAbertasByPropertyCost(ctx.ownerId, input.id);
       await db.deletePropertyCost(ctx.ownerId, input.id);
       await sincronizarCustosDoImovel(ctx.ownerId, atual.propertyId);
     }),

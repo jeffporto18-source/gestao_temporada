@@ -351,6 +351,13 @@
       "when": 1786831081121,
       "tag": "0049_add_statements",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "5",
+      "when": 1786831141121,
+      "tag": "0050_condominio_iptu_padrao_imovel",
+      "breakpoints": true
     }
   ]
 }

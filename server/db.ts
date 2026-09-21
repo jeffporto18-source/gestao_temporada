@@ -22,6 +22,7 @@ import {
   longTermContracts,
   contractRentCharges,
   InsertClient,
+  Property,
   InsertProperty,
   InsertLedgerEntry,
   InsertLedgerCharge,
@@ -247,11 +248,18 @@ export async function deleteLedgerEntry(ownerId: number, id: number) {
 /** Ocorrências mensais de um lançamento manual, com baixa e comprovante próprios. */
 export async function listLedgerCharges(
   ownerId: number,
-  filtros?: { ledgerEntryId?: number; propertyId?: number; grupo?: "despesa_fixa" | "despesa_variavel" | "receita" | "aporte_capital" | "repasse_caucao"; status?: "aberto" | "pago" | "cancelado" },
+  filtros?: {
+    ledgerEntryId?: number;
+    propertyCostId?: number;
+    propertyId?: number;
+    grupo?: "despesa_fixa" | "despesa_variavel" | "receita" | "aporte_capital" | "repasse_caucao";
+    status?: "aberto" | "pago" | "cancelado";
+  },
 ) {
   const db = await requireDb();
   const conds = [eq(ledgerCharges.ownerId, ownerId)];
   if (filtros?.ledgerEntryId) conds.push(eq(ledgerCharges.ledgerEntryId, filtros.ledgerEntryId));
+  if (filtros?.propertyCostId) conds.push(eq(ledgerCharges.propertyCostId, filtros.propertyCostId));
   if (filtros?.propertyId) conds.push(eq(ledgerCharges.propertyId, filtros.propertyId));
   if (filtros?.grupo) conds.push(eq(ledgerCharges.grupo, filtros.grupo));
   if (filtros?.status) conds.push(eq(ledgerCharges.status, filtros.status));
@@ -281,9 +289,20 @@ export async function deleteLedgerChargesAbertas(ownerId: number, ledgerEntryId:
   await db.delete(ledgerCharges).where(and(eq(ledgerCharges.ownerId, ownerId), eq(ledgerCharges.ledgerEntryId, ledgerEntryId), eq(ledgerCharges.status, "aberto")));
 }
 
+/** Mesma ideia, para quando o custo do imóvel (não o lançamento) é excluído — mantém baixa/comprovante já registrados. */
+export async function deleteLedgerChargesAbertasByPropertyCost(ownerId: number, propertyCostId: number) {
+  const db = await requireDb();
+  await db.delete(ledgerCharges).where(and(eq(ledgerCharges.ownerId, ownerId), eq(ledgerCharges.propertyCostId, propertyCostId), eq(ledgerCharges.status, "aberto")));
+}
+
 export async function deleteLedgerChargesByEntry(ownerId: number, ledgerEntryId: number) {
   const db = await requireDb();
   await db.delete(ledgerCharges).where(and(eq(ledgerCharges.ownerId, ownerId), eq(ledgerCharges.ledgerEntryId, ledgerEntryId)));
+}
+
+export async function deleteLedgerCharge(ownerId: number, id: number) {
+  const db = await requireDb();
+  await db.delete(ledgerCharges).where(and(eq(ledgerCharges.ownerId, ownerId), eq(ledgerCharges.id, id)));
 }
 
 /** Bloqueia excluir/editar o cadastro quando algum mês já foi baixado — protege a baixa e o comprovante anexado. */
@@ -985,17 +1004,24 @@ export function contratoCobreCompetencia(contrato: LongTermContract, competencia
 /**
  * Quem paga um custo numa competência — a única fonte dessa decisão no sistema.
  *
- * Sem contrato cobrindo o mês (imóvel vago) o custo é do proprietário: não há a quem repassar.
- * Nos rateios extraordinários a responsabilidade vem do próprio registro, porque é negociada caso
- * a caso; quando ela recai sobre o inquilino, o custo segue a forma de cobrança que o contrato já
- * usa para o condomínio (direto ou junto com o aluguel).
+ * Sem contrato cobrindo o mês (imóvel vago, ou sem contrato formal — comum em imóvel de holding),
+ * vale o padrão cadastrado no imóvel (condominioPorPadrao/iptuPorPadrao); com contrato, o campo do
+ * CONTRATO manda, porque pode mudar a cada inquilino. Nos rateios extraordinários a responsabilidade
+ * vem do próprio registro, porque é negociada caso a caso; quando ela recai sobre o inquilino, o
+ * custo segue a forma de cobrança que o contrato já usa para o condomínio (direto ou junto com o
+ * aluguel) — sem contrato, cai no padrão do imóvel como qualquer outro custo do proprietário.
  */
-export function responsavelPeloCusto(custo: PropertyCost, contrato: LongTermContract | null): CostResponsibility {
-  if (!contrato) return "proprietario";
+export function responsavelPeloCusto(
+  custo: PropertyCost,
+  contrato: LongTermContract | null,
+  imovel: Pick<Property, "condominioPorPadrao" | "iptuPorPadrao">,
+): CostResponsibility {
   if (custo.tipo === "condominio_extra") {
-    if (custo.responsavel !== "inquilino") return "proprietario";
+    if (!contrato || custo.responsavel !== "inquilino") return "proprietario";
     return contrato.condominioPor === "inquilino_via_repasse" ? "inquilino_via_repasse" : "inquilino_direto";
   }
+  const padraoDoImovel = custo.tipo === "iptu" ? imovel.iptuPorPadrao : imovel.condominioPorPadrao;
+  if (!contrato) return padraoDoImovel as CostResponsibility;
   return (custo.tipo === "iptu" ? contrato.iptuPor : contrato.condominioPor) as CostResponsibility;
 }
 
@@ -1004,9 +1030,10 @@ export async function custosDaCompetencia(ownerId: number, propertyId: number, c
   const custos = await listPropertyCosts(ownerId, propertyId);
   const vigentes = custos.filter((c) => competenciaNaSerie(c.competenciaInicio, c.qtdMeses, competencia));
   if (vigentes.length === 0) return [];
-  const contratos = await listLongTermContracts(ownerId, propertyId);
+  const [contratos, imovel] = await Promise.all([listLongTermContracts(ownerId, propertyId), getProperty(ownerId, propertyId)]);
+  if (!imovel) return [];
   const contrato = contratos.find((c) => contratoCobreCompetencia(c, competencia)) ?? null;
-  return vigentes.map((custo) => ({ custo, responsavel: responsavelPeloCusto(custo, contrato) }));
+  return vigentes.map((custo) => ({ custo, responsavel: responsavelPeloCusto(custo, contrato, imovel) }));
 }
 
 // --------------------------------------------------------- long term contracts

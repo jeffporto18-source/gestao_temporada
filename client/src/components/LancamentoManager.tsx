@@ -13,7 +13,7 @@ import { Card } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Pencil, Trash2, Settings, TriangleAlert } from "lucide-react";
+import { Pencil, Trash2, Settings, TriangleAlert, Lock } from "lucide-react";
 import { brl, formatCompetencia, addMesesCompetencia } from "@/lib/format";
 import { PageHeader, EmptyState } from "@/pages/Clientes";
 import { Link } from "wouter";
@@ -108,8 +108,10 @@ export default function LancamentoManager({ titulo, subtitulo, grupos, contrapar
   const entries = useMemo(
     () =>
       (entriesTodos ?? [])
-        // Exclui lançamentos automáticos (gerados por reserva, parcela de contrato ou custo do imóvel) — essa tela é só para lançamentos manuais.
-        .filter((e) => grupos.includes(e.grupo as Grupo) && !e.reservationId && !e.contractRentChargeId && !e.propertyCostId)
+        // Exclui lançamentos automáticos de reserva ou parcela de contrato — essa tela é só para
+        // lançamentos manuais. Custo do imóvel (condomínio/IPTU quando é do proprietário) aparece
+        // aqui também, mas só para consulta: edição/exclusão continuam no cadastro do imóvel.
+        .filter((e) => grupos.includes(e.grupo as Grupo) && !e.reservationId && !e.contractRentChargeId)
         .map((e) => ({ ...e, valor: Number(e.valor) })),
     [entriesTodos, grupos],
   );
@@ -374,14 +376,21 @@ export default function LancamentoManager({ titulo, subtitulo, grupos, contrapar
                     ? `${formatCompetencia(e.competenciaInicio)} → ${formatCompetencia(addMesesCompetencia(e.competenciaInicio, e.qtdMeses - 1))} (${e.qtdMeses}m)`
                     : formatCompetencia(e.competenciaInicio)}
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => openEdit(e)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => del.mutate({ id: e.id })}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                {e.propertyCostId ? (
+                  <div className="flex items-center gap-1 shrink-0 text-muted-foreground" title="Custo do imóvel — edite ou exclua no cadastro do imóvel">
+                    <Lock className="h-3.5 w-3.5" />
+                    <span className="text-xs hidden lg:inline">Custo do imóvel</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => openEdit(e)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => del.mutate({ id: e.id })}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
