@@ -13,6 +13,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2, Pencil, Check, X, ChevronRight, ChevronDown } from "lucide-react";
 import { PageHeader } from "./Clientes";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 type Grupo = "conta_principal" | "despesa_fixa" | "despesa_variavel" | "receita" | "aporte_capital" | "repasse_caucao";
 type ChartAccount = RouterOutputs["chartAccounts"]["list"][number];
@@ -33,6 +34,10 @@ const DEPTH_LABEL = (depth: number) =>
 export default function PlanoContas() {
   const utils = trpc.useUtils();
   const { data: contas, isLoading } = trpc.chartAccounts.list.useQuery({});
+  const { user } = useAuth();
+  // Código contábil é de uso interno da contabilidade — só quem tem role="admin" (o escritório) vê
+  // e edita esse campo, mesmo estando dentro dos dados de uma empresa cliente.
+  const isContabilidade = user?.role === "admin";
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   // Apenas um fluxo de edição/criação ativo por vez, sempre inline na própria árvore.
@@ -40,9 +45,10 @@ export default function PlanoContas() {
   const [addingRoot, setAddingRoot] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [nome, setNome] = useState("");
+  const [codigoContabil, setCodigoContabil] = useState("");
   const [grupo, setGrupo] = useState<Grupo>("conta_principal");
 
-  const closeAll = () => { setAddingUnderId(null); setAddingRoot(false); setEditingId(null); setNome(""); };
+  const closeAll = () => { setAddingUnderId(null); setAddingRoot(false); setEditingId(null); setNome(""); setCodigoContabil(""); };
 
   const create = trpc.chartAccounts.create.useMutation({
     onSuccess: (_, vars) => {
@@ -84,9 +90,9 @@ export default function PlanoContas() {
     });
   };
 
-  const startAddUnder = (parentId: number) => { setAddingRoot(false); setEditingId(null); setAddingUnderId(parentId); setNome(""); };
-  const startAddRoot = () => { setAddingUnderId(null); setEditingId(null); setAddingRoot(true); setNome(""); setGrupo("conta_principal"); };
-  const startEdit = (a: ChartAccount) => { setAddingUnderId(null); setAddingRoot(false); setEditingId(a.id); setNome(a.nome); };
+  const startAddUnder = (parentId: number) => { setAddingRoot(false); setEditingId(null); setAddingUnderId(parentId); setNome(""); setCodigoContabil(""); };
+  const startAddRoot = () => { setAddingUnderId(null); setEditingId(null); setAddingRoot(true); setNome(""); setCodigoContabil(""); setGrupo("conta_principal"); };
+  const startEdit = (a: ChartAccount) => { setAddingUnderId(null); setAddingRoot(false); setEditingId(a.id); setNome(a.nome); setCodigoContabil(a.codigoContabil ?? ""); };
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -118,11 +124,14 @@ export default function PlanoContas() {
                 editingId={editingId}
                 nome={nome}
                 setNome={setNome}
+                codigoContabil={codigoContabil}
+                setCodigoContabil={setCodigoContabil}
+                isContabilidade={isContabilidade}
                 onStartAdd={startAddUnder}
                 onStartEdit={startEdit}
                 onCancel={closeAll}
-                onConfirmAdd={(parentId) => nome.trim() && create.mutate({ nome: nome.trim(), parentId })}
-                onConfirmEdit={(id) => nome.trim() && update.mutate({ id, nome: nome.trim() })}
+                onConfirmAdd={(parentId) => nome.trim() && create.mutate({ nome: nome.trim(), parentId, codigoContabil: codigoContabil.trim() || undefined })}
+                onConfirmEdit={(id) => nome.trim() && update.mutate({ id, nome: nome.trim(), codigoContabil: codigoContabil.trim() || null })}
                 onExcluir={(id) => del.mutate({ id })}
                 pending={create.isPending || update.isPending}
               />
@@ -137,7 +146,7 @@ export default function PlanoContas() {
                   placeholder="Nome da conta principal"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && nome.trim()) create.mutate({ nome: nome.trim(), grupo }); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" && nome.trim()) create.mutate({ nome: nome.trim(), grupo, codigoContabil: codigoContabil.trim() || undefined }); }}
                 />
                 <Select value={grupo} onValueChange={(v) => setGrupo(v as Grupo)}>
                   <SelectTrigger className="h-8 w-44 shrink-0"><SelectValue /></SelectTrigger>
@@ -147,7 +156,16 @@ export default function PlanoContas() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button size="sm" disabled={!nome.trim() || create.isPending} onClick={() => create.mutate({ nome: nome.trim(), grupo })}>
+                {isContabilidade && (
+                  <Input
+                    className="h-8 w-32 shrink-0 focus-visible:ring-2"
+                    placeholder="Cód. contábil"
+                    value={codigoContabil}
+                    onChange={(e) => setCodigoContabil(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && nome.trim()) create.mutate({ nome: nome.trim(), grupo, codigoContabil: codigoContabil.trim() || undefined }); }}
+                  />
+                )}
+                <Button size="sm" disabled={!nome.trim() || create.isPending} onClick={() => create.mutate({ nome: nome.trim(), grupo, codigoContabil: codigoContabil.trim() || undefined })}>
                   Adicionar
                 </Button>
                 <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={closeAll}>Cancelar</Button>
@@ -174,6 +192,9 @@ function AccountNode({
   editingId,
   nome,
   setNome,
+  codigoContabil,
+  setCodigoContabil,
+  isContabilidade,
   onStartAdd,
   onStartEdit,
   onCancel,
@@ -191,6 +212,9 @@ function AccountNode({
   editingId: number | null;
   nome: string;
   setNome: (v: string) => void;
+  codigoContabil: string;
+  setCodigoContabil: (v: string) => void;
+  isContabilidade: boolean;
   onStartAdd: (parentId: number) => void;
   onStartEdit: (a: ChartAccount) => void;
   onCancel: () => void;
@@ -225,6 +249,15 @@ function AccountNode({
               onChange={(e) => setNome(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && nome.trim()) onConfirmEdit(conta.id); if (e.key === "Escape") onCancel(); }}
             />
+            {isContabilidade && (
+              <Input
+                className="h-8 w-28 shrink-0 focus-visible:ring-2"
+                placeholder="Cód. contábil"
+                value={codigoContabil}
+                onChange={(e) => setCodigoContabil(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && nome.trim()) onConfirmEdit(conta.id); if (e.key === "Escape") onCancel(); }}
+              />
+            )}
             <Button variant="ghost" size="icon" className="h-7 w-7 text-primary shrink-0" disabled={!nome.trim() || pending} onClick={() => onConfirmEdit(conta.id)}>
               <Check className="h-4 w-4" />
             </Button>
@@ -234,7 +267,12 @@ function AccountNode({
           </>
         ) : (
           <>
-            <span className={`flex-1 truncate ${depth === 0 ? "text-sm font-semibold" : "text-sm"}`}>{conta.nome}</span>
+            <span className={`flex-1 truncate ${depth === 0 ? "text-sm font-semibold" : "text-sm"}`}>
+              {conta.nome}
+              {isContabilidade && conta.codigoContabil && (
+                <span className="ml-2 text-[11px] text-muted-foreground font-normal">({conta.codigoContabil})</span>
+              )}
+            </span>
             {depth > 0 && (
               <span className="text-[11px] text-muted-foreground shrink-0">{DEPTH_LABEL(depth)}</span>
             )}
@@ -263,6 +301,15 @@ function AccountNode({
             onChange={(e) => setNome(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && nome.trim()) onConfirmAdd(conta.id); if (e.key === "Escape") onCancel(); }}
           />
+          {isContabilidade && (
+            <Input
+              className="h-8 w-28 shrink-0 focus-visible:ring-2"
+              placeholder="Cód. contábil"
+              value={codigoContabil}
+              onChange={(e) => setCodigoContabil(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && nome.trim()) onConfirmAdd(conta.id); if (e.key === "Escape") onCancel(); }}
+            />
+          )}
           <Button size="sm" disabled={!nome.trim() || pending} onClick={() => onConfirmAdd(conta.id)}>
             Adicionar
           </Button>
@@ -288,6 +335,9 @@ function AccountNode({
           editingId={editingId}
           nome={nome}
           setNome={setNome}
+          codigoContabil={codigoContabil}
+          setCodigoContabil={setCodigoContabil}
+          isContabilidade={isContabilidade}
           onStartAdd={onStartAdd}
           onStartEdit={onStartEdit}
           onCancel={onCancel}

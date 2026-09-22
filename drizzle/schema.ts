@@ -162,6 +162,9 @@ export const chartAccounts = mysqlTable("chart_accounts", {
   nome: varchar("nome", { length: 100 }).notNull(),
   parentId: int("parentId"), // null = conta principal (nível 0); caso contrário, aponta para o pai imediato (máx. nível 3)
   ativa: int("ativa").notNull().default(1),
+  // Código de lançamento contábil (uso interno da contabilidade — quem administra a empresa não
+  // vê nem edita este campo, só a contabilidade, identificada por users.role = "admin").
+  codigoContabil: varchar("codigoContabil", { length: 50 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -189,6 +192,7 @@ export const ledgerEntries = mysqlTable("ledger_entries", {
   chartAccountId: int("chartAccountId"), // referencia chart_accounts.id (nulo = desconto sem classificação, só com descrição)
   grupo: mysqlEnum("grupo", ["despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao"]).notNull(), // denormalizado da conta, para consulta rápida
   categoria: varchar("categoria", { length: 300 }), // caminho da conta (denormalizado para consulta rápida)
+  codigoContabil: varchar("codigoContabil", { length: 50 }), // denormalizado da conta, idem — uso interno da contabilidade
   descricao: varchar("descricao", { length: 300 }),
   contraparte: varchar("contraparte", { length: 150 }), // cliente/origem (receita) ou fornecedor (despesa/aporte)
   valor: decimal("valor", { precision: 12, scale: 2 }).notNull(),
@@ -227,6 +231,7 @@ export const ledgerCharges = mysqlTable("ledger_charges", {
   propertyId: int("propertyId"),
   grupo: mysqlEnum("grupo", ["despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao"]).notNull(),
   categoria: varchar("categoria", { length: 300 }),
+  codigoContabil: varchar("codigoContabil", { length: 50 }), // uso interno da contabilidade
   descricao: varchar("descricao", { length: 300 }),
   contraparte: varchar("contraparte", { length: 150 }),
   competencia: varchar("competencia", { length: 7 }).notNull(), // "AAAA-MM"

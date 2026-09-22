@@ -358,6 +358,13 @@
       "when": 1786831141121,
       "tag": "0050_condominio_iptu_padrao_imovel",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "5",
+      "when": 1786831201121,
+      "tag": "0051_codigo_contabil",
+      "breakpoints": true
     }
   ]
 }

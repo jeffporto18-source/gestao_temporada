@@ -20,9 +20,11 @@ import {
 } from "@/components/ui/dialog";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Circle, CheckCircle2, Ban, RotateCcw, Paperclip, ExternalLink, Loader2, Printer } from "lucide-react";
+import { Circle, CheckCircle2, Ban, RotateCcw, Paperclip, ExternalLink, Loader2, Printer, FileSpreadsheet } from "lucide-react";
 import { brl, formatDate, formatCompetencia } from "@/lib/format";
 import { PageHeader, EmptyState, SkeletonList } from "./Clientes";
+import { useAuth } from "@/_core/hooks/useAuth";
+import * as XLSX from "xlsx";
 
 type Charge = RouterOutputs["ledgerCharges"]["list"][number];
 type Tipo = "" | "despesa" | "receita" | "aporte" | "repasse";
@@ -53,8 +55,17 @@ function rotuloBaixa(grupo: Charge["grupo"]) {
   return "Dar baixa";
 }
 
+const STATUS_LABEL: Record<Charge["status"], string> = {
+  aberto: "Em aberto",
+  pago: "Baixado",
+  cancelado: "Cancelado",
+};
+
 export default function Relatorio() {
   const utils = trpc.useUtils();
+  const { user } = useAuth();
+  // Código contábil é de uso interno da contabilidade — só quem tem role="admin" (o escritório) vê.
+  const isContabilidade = user?.role === "admin";
   const { data: imoveis } = trpc.properties.list.useQuery();
   const hoje = new Date();
   const [mesInicio, setMesInicio] = useState(String(1));
@@ -130,6 +141,32 @@ export default function Relatorio() {
       }));
   }, [charges]);
 
+  function baixarExcel() {
+    const linhas = charges.map((c) => {
+      const linha: Record<string, string | number> = {
+        Competência: formatCompetencia(c.competencia),
+        Imóvel: nomeImovel(c.propertyId),
+        Descrição: c.descricao || c.categoria || "—",
+        Contraparte: c.contraparte || "—",
+        Vencimento: formatDate(c.dataVencimento),
+        Valor: Number(c.valor),
+        Situação: STATUS_LABEL[c.status],
+        "Data pagamento": c.dataPagamento ? formatDate(c.dataPagamento) : "—",
+        "Valor pago": c.valorPago ? Number(c.valorPago) : "—",
+      };
+      if (isContabilidade) linha["Código Contábil"] = c.codigoContabil || "—";
+      return linha;
+    });
+    const ws = XLSX.utils.json_to_sheet(linhas);
+    ws["!cols"] = [
+      { wch: 14 }, { wch: 22 }, { wch: 30 }, { wch: 22 }, { wch: 12 },
+      { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Relatório");
+    XLSX.writeFile(wb, `relatorio-${de}-a-${ate}.xlsx`);
+  }
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-4 flex items-start justify-between gap-3 print:hidden">
@@ -137,9 +174,14 @@ export default function Relatorio() {
           title="Relatório"
           subtitle="Cada mês do período, com data própria e baixa individual — dê baixa e anexe o comprovante."
         />
-        <Button variant="outline" className="bg-background shrink-0" onClick={() => window.print()}>
-          <Printer className="mr-1.5 h-4 w-4" /> Imprimir PDF
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" className="bg-background" onClick={baixarExcel}>
+            <FileSpreadsheet className="mr-1.5 h-4 w-4" /> Baixar Excel
+          </Button>
+          <Button variant="outline" className="bg-background" onClick={() => window.print()}>
+            <Printer className="mr-1.5 h-4 w-4" /> Imprimir PDF
+          </Button>
+        </div>
       </div>
 
       {/* Só aparece na impressão — identifica o período no papel/PDF gerado. */}
@@ -270,7 +312,7 @@ export default function Relatorio() {
                 <ChargeRow key={c.id}>
                   <button className="flex items-center gap-1.5 min-w-0 text-left" onClick={() => setBaixando(c)} title={rotuloBaixa(c.grupo)}>
                     <Circle className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <RowLabel charge={c} nomeImovel={nomeImovel(c.propertyId)} />
+                    <RowLabel charge={c} nomeImovel={nomeImovel(c.propertyId)} mostrarCodigo={isContabilidade} />
                   </button>
                   <div className="flex items-center gap-1 shrink-0">
                     <ComprovanteControle charge={c} />
@@ -288,7 +330,7 @@ export default function Relatorio() {
                     <ChargeRow key={c.id} tom="bg-primary/5">
                       <button className="flex items-center gap-1.5 min-w-0 text-left" onClick={() => reabrir.mutate({ id: c.id })} title="Voltar para em aberto">
                         <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
-                        <RowLabel charge={c} nomeImovel={nomeImovel(c.propertyId)} pago />
+                        <RowLabel charge={c} nomeImovel={nomeImovel(c.propertyId)} pago mostrarCodigo={isContabilidade} />
                       </button>
                       <div className="flex items-center gap-1 shrink-0">
                         <ComprovanteControle charge={c} />
@@ -308,7 +350,7 @@ export default function Relatorio() {
                     <ChargeRow key={c.id} tom="opacity-60">
                       <span className="flex items-center gap-1.5 min-w-0">
                         <Ban className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                        <RowLabel charge={c} nomeImovel={nomeImovel(c.propertyId)} />
+                        <RowLabel charge={c} nomeImovel={nomeImovel(c.propertyId)} mostrarCodigo={isContabilidade} />
                       </span>
                       <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => reabrir.mutate({ id: c.id })} title="Reabrir">
                         <RotateCcw className="h-3 w-3" />
@@ -327,12 +369,15 @@ export default function Relatorio() {
   );
 }
 
-function RowLabel({ charge, nomeImovel, pago }: { charge: Charge; nomeImovel: string; pago?: boolean }) {
+function RowLabel({ charge, nomeImovel, pago, mostrarCodigo }: { charge: Charge; nomeImovel: string; pago?: boolean; mostrarCodigo?: boolean }) {
   const entrada = charge.grupo === "receita" || charge.grupo === "aporte_capital";
   return (
     <span className="min-w-0">
       <span className="font-medium truncate block">
         {nomeImovel} — {charge.descricao || charge.categoria || "—"}
+        {mostrarCodigo && charge.codigoContabil && (
+          <span className="ml-1.5 text-[11px] text-muted-foreground font-normal">({charge.codigoContabil})</span>
+        )}
       </span>
       <span className="text-[11px] text-muted-foreground block">
         {pago

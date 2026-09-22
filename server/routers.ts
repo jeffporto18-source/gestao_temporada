@@ -98,6 +98,7 @@ async function sincronizarLedgerCharges(ownerId: number, entry: NonNullable<Awai
       propertyId: entry.propertyId,
       grupo: entry.grupo,
       categoria: entry.categoria,
+      codigoContabil: entry.codigoContabil,
       descricao: entry.descricao,
       contraparte: entry.contraparte,
       competencia,
@@ -844,7 +845,11 @@ export const appRouter = router({
       .input(z.object({ grupo: z.enum(["conta_principal", "despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao"]).optional() }).optional())
       .query(async ({ ctx, input }) => {
         const all = await db.seedDefaultChartAccountsIfNeeded(ctx.ownerId);
-        return input?.grupo ? all.filter((a) => a.grupo === input.grupo) : all;
+        const filtrados = input?.grupo ? all.filter((a) => a.grupo === input.grupo) : all;
+        // Código contábil é de uso interno da contabilidade (role="admin") — nunca sai da API pra
+        // quem não é contabilidade, mesmo que a tela nunca mostrasse o campo.
+        if (ctx.user.role === "admin") return filtrados;
+        return filtrados.map((a) => ({ ...a, codigoContabil: null }));
       }),
     create: escritaProcedure
       .input(
@@ -852,6 +857,7 @@ export const appRouter = router({
           grupo: z.enum(["conta_principal", "despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao"]).optional(),
           nome: z.string().min(1),
           parentId: z.number().optional(),
+          codigoContabil: z.string().max(50).optional(),
         }),
       )
       .mutation(async ({ ctx, input }) => {
@@ -867,11 +873,24 @@ export const appRouter = router({
           grupo = pai.grupo;
         }
         if (!grupo) throw new Error("Selecione a natureza da conta principal.");
-        return db.createChartAccount({ ownerId: ctx.ownerId, grupo, nome: input.nome, parentId: input.parentId ?? null, ativa: 1 });
+        return db.createChartAccount({
+          ownerId: ctx.ownerId,
+          grupo,
+          nome: input.nome,
+          parentId: input.parentId ?? null,
+          ativa: 1,
+          codigoContabil: ctx.user.role === "admin" ? input.codigoContabil || null : null,
+        });
       }),
     update: escritaProcedure
-      .input(z.object({ id: z.number(), nome: z.string().optional(), ativa: z.number().min(0).max(1).optional() }))
-      .mutation(({ ctx, input }) => db.updateChartAccount(ctx.ownerId, input.id, { nome: input.nome, ativa: input.ativa })),
+      .input(z.object({ id: z.number(), nome: z.string().optional(), ativa: z.number().min(0).max(1).optional(), codigoContabil: z.string().max(50).nullable().optional() }))
+      .mutation(({ ctx, input }) =>
+        db.updateChartAccount(ctx.ownerId, input.id, {
+          nome: input.nome,
+          ativa: input.ativa,
+          ...(ctx.user.role === "admin" && input.codigoContabil !== undefined ? { codigoContabil: input.codigoContabil || null } : {}),
+        }),
+      ),
     delete: escritaProcedure.input(z.object({ id: z.number() })).mutation(({ ctx, input }) => db.deleteChartAccount(ctx.ownerId, input.id)),
   }),
 
@@ -907,6 +926,7 @@ export const appRouter = router({
           chartAccountId: conta.id,
           grupo: conta.grupo,
           categoria: nome,
+          codigoContabil: conta.codigoContabil,
           descricao: input.descricao || null,
           contraparte: input.contraparte || null,
           valor: String(input.valor),
@@ -943,7 +963,7 @@ export const appRouter = router({
         let contaFields = {};
         if (chartAccountId !== undefined) {
           const { conta, nome } = await resolveChartAccount(ctx.ownerId, chartAccountId, CHART_ACCOUNT_GRUPOS);
-          contaFields = { chartAccountId: conta.id, grupo: conta.grupo, categoria: nome };
+          contaFields = { chartAccountId: conta.id, grupo: conta.grupo, categoria: nome, codigoContabil: conta.codigoContabil };
         }
         await db.updateLedgerEntry(ctx.ownerId, id, {
           ...rest,
@@ -976,7 +996,11 @@ export const appRouter = router({
           status: z.enum(["aberto", "pago", "cancelado"]).optional(),
         }),
       )
-      .query(({ ctx, input }) => db.listLedgerCharges(ctx.ownerId, input)),
+      .query(async ({ ctx, input }) => {
+        const charges = await db.listLedgerCharges(ctx.ownerId, input);
+        if (ctx.user.role === "admin") return charges;
+        return charges.map((c) => ({ ...c, codigoContabil: null }));
+      }),
     pagar: escritaProcedure
       .input(z.object({ id: z.number(), valorPago: z.number().min(0), dataPagamento: z.string() }))
       .mutation(({ ctx, input }) =>
