@@ -400,10 +400,16 @@ export const appRouter = router({
           password: z.string().min(6),
           telefone: z.string().optional(),
           nivel: z.enum(NIVEIS_ACESSO).default("total"),
+          // Funcionário da contabilidade: enxerga todas as empresas cadastradas, não só esta.
+          contabilidade: z.boolean().optional(),
         }),
       )
       .mutation(async ({ ctx, input }) => {
         if (ctx.nivel !== "total") throw new Error("Seu acesso nesta empresa não permite adicionar usuários.");
+        // Só quem já é do escritório (role=admin) pode formar outro do escritório.
+        if (input.contabilidade && ctx.user.role !== "admin") {
+          throw new Error("Só o escritório pode cadastrar um funcionário da contabilidade.");
+        }
         await db.createTeamUser({
           ownerId: ctx.ownerId,
           name: input.name,
@@ -411,6 +417,7 @@ export const appRouter = router({
           password: input.password,
           telefone: input.telefone,
           nivel: input.nivel,
+          role: input.contabilidade && ctx.user.role === "admin" ? "admin" : undefined,
         });
         return { success: true };
       }),

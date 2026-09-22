@@ -450,6 +450,8 @@ export async function createTeamUser(data: {
   password: string;
   telefone?: string | null;
   nivel?: NivelAcesso;
+  /** "admin" = funcionário da contabilidade, com acesso a todas as empresas (mesmo alcance do escritório). */
+  role?: "user" | "admin";
 }) {
   const db = await requireDb();
   const bcrypt = await import("bcryptjs");
@@ -473,6 +475,7 @@ export async function createTeamUser(data: {
     invitedBy: data.ownerId,
     telefone: data.telefone ? data.telefone.replace(/\D/g, "") : null,
     lastSignedIn: new Date(),
+    ...(data.role ? { role: data.role } : {}),
   });
 
   // O funcionário opera a empresa de quem o convidou — não uma empresa própria. Antes desta linha

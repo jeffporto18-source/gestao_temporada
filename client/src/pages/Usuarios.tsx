@@ -27,11 +27,19 @@ import { toast } from "sonner";
 import { Loader2, Plus, Trash2, Users, Mail, Phone, User } from "lucide-react";
 import { formatPhone } from "@shared/validators";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { NIVEIS_ACESSO, NIVEL_ACESSO_INFO, type NivelAcesso } from "@shared/niveis";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 export default function Usuarios() {
   const { data: teamUsers, isLoading } = trpc.team.list.useQuery();
+  const { user } = useAuth();
   const utils = trpc.useUtils();
+
+  // "Contabilidade" = funcionário com acesso a todas as empresas (role=admin, o mesmo alcance do
+  // escritório). Só quem já é do escritório pode marcar isso — o servidor confere de novo, isso aqui
+  // só decide se o campo aparece.
+  const podeMarcarContabilidade = user?.role === "admin";
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState("");
@@ -39,6 +47,7 @@ export default function Usuarios() {
   const [password, setPassword] = useState("");
   const [telefone, setTelefone] = useState("");
   const [nivel, setNivel] = useState<NivelAcesso>("operacional");
+  const [contabilidade, setContabilidade] = useState(false);
 
   const createMutation = trpc.team.create.useMutation({
     onSuccess: () => {
@@ -72,6 +81,7 @@ export default function Usuarios() {
     setPassword("");
     setTelefone("");
     setNivel("operacional");
+    setContabilidade(false);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -90,6 +100,7 @@ export default function Usuarios() {
       password,
       telefone: telefone ? telefone.replace(/\D/g, "") : undefined,
       nivel,
+      contabilidade: podeMarcarContabilidade && contabilidade ? true : undefined,
     });
   }
 
@@ -154,18 +165,36 @@ export default function Usuarios() {
                   minLength={6}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Nível de acesso</Label>
-                <Select value={nivel} onValueChange={(v) => setNivel(v as NivelAcesso)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {NIVEIS_ACESSO.map((n) => (
-                      <SelectItem key={n} value={n}>{NIVEL_ACESSO_INFO[n].label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">{NIVEL_ACESSO_INFO[nivel].descricao}</p>
-              </div>
+              {podeMarcarContabilidade && (
+                <div className="flex items-start gap-2 rounded-lg border border-border bg-secondary/40 px-3 py-2.5">
+                  <Checkbox
+                    id="contabilidade"
+                    checked={contabilidade}
+                    onCheckedChange={(v) => setContabilidade(v === true)}
+                    className="mt-0.5"
+                  />
+                  <Label htmlFor="contabilidade" className="cursor-pointer font-normal">
+                    Funcionário da contabilidade
+                    <span className="block text-xs text-muted-foreground font-normal mt-0.5">
+                      Acesso a todas as empresas cadastradas no sistema, não só a esta.
+                    </span>
+                  </Label>
+                </div>
+              )}
+              {!contabilidade && (
+                <div className="space-y-2">
+                  <Label>Nível de acesso</Label>
+                  <Select value={nivel} onValueChange={(v) => setNivel(v as NivelAcesso)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {NIVEIS_ACESSO.map((n) => (
+                        <SelectItem key={n} value={n}>{NIVEL_ACESSO_INFO[n].label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">{NIVEL_ACESSO_INFO[nivel].descricao}</p>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="newTelefone">Telefone / WhatsApp (opcional)</Label>
                 <Input
@@ -237,6 +266,11 @@ export default function Usuarios() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {user.role === "admin" ? (
+                    <span className="h-8 flex items-center rounded-md border border-border bg-secondary/50 px-2.5 text-xs font-medium text-muted-foreground">
+                      Contabilidade · todas as empresas
+                    </span>
+                  ) : (
                   <Select
                     value={user.nivel ?? "total"}
                     onValueChange={(v) => alterarNivel.mutate({ userId: user.id, nivel: v as NivelAcesso })}
@@ -250,6 +284,7 @@ export default function Usuarios() {
                       ))}
                     </SelectContent>
                   </Select>
+                  )}
 
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
