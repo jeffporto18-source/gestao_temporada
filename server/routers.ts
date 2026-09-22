@@ -1872,7 +1872,15 @@ export const appRouter = router({
         const custoUnit = Number(prop.custoFaxina ?? 0);
         let importadas = 0;
 
+        // Reimportar o mesmo arquivo (ou clicar "Importar" duas vezes) não pode duplicar reservas —
+        // pula qualquer código que já exista neste imóvel.
+        const existentes = await db.listReservations(ctx.ownerId, input.propertyId);
+        const codigosExistentes = new Set(existentes.map((r) => r.codigo));
+
         for (const row of input.rows) {
+          if (codigosExistentes.has(row.codigo)) continue;
+          codigosExistentes.add(row.codigo);
+
           const novaReservaId = await db.createReservation({
             ownerId: ctx.ownerId,
             propertyId: input.propertyId,
