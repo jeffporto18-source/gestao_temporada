@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { PageHeader } from "./Clientes";
 import { brl } from "@/lib/format";
+import * as XLSX from "xlsx";
 
 interface CsvRow {
   codigo: string;
@@ -234,6 +235,22 @@ function parseCsv(text: string): { headers: string[]; rows: string[][] } {
   return { headers, rows };
 }
 
+/** Mesmo formato de saída de parseCsv, mas lendo a primeira planilha de um arquivo Excel (.xlsx/.xls). */
+function parseXlsx(data: ArrayBuffer): { headers: string[]; rows: string[][] } {
+  const wb = XLSX.read(data, { type: "array", cellDates: true });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
+  if (aoa.length < 2) return { headers: [], rows: [] };
+  const toStr = (v: unknown): string => {
+    if (v instanceof Date) return v.toISOString().slice(0, 10);
+    if (typeof v === "number") return String(v);
+    return String(v ?? "").trim();
+  };
+  const headers = aoa[0].map((h) => toStr(h).toLowerCase());
+  const rows = aoa.slice(1).map((r) => r.map(toStr));
+  return { headers, rows };
+}
+
 /** Extrai os campos lógicos reconhecidos de uma linha, sem interpretar/validar ainda. */
 function extractFields(headers: string[], row: string[]): Partial<Record<LogicalField, string>> {
   const out: Partial<Record<LogicalField, string>> = {};
@@ -341,10 +358,12 @@ export default function ImportarCsv() {
     setFileName(file.name);
     setPropertyMap({});
 
+    const isExcel = /\.xlsx?$/i.test(file.name);
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const text = ev.target?.result as string;
-      const { headers, rows } = parseCsv(text);
+      const { headers, rows } = isExcel
+        ? parseXlsx(ev.target?.result as ArrayBuffer)
+        : parseCsv(ev.target?.result as string);
 
       if (!headers.length) {
         setErrors(["Arquivo vazio ou formato inválido."]);
@@ -417,7 +436,8 @@ export default function ImportarCsv() {
       setParsedRows(mapped);
       setErrors(errs);
     };
-    reader.readAsText(file, "utf-8");
+    if (isExcel) reader.readAsArrayBuffer(file);
+    else reader.readAsText(file, "utf-8");
   };
 
   const submit = async () => {
@@ -483,7 +503,7 @@ export default function ImportarCsv() {
 
         {/* Upload */}
         <div className="grid gap-1.5">
-          <Label>Arquivo CSV</Label>
+          <Label>Arquivo (CSV ou Excel)</Label>
           <div className="flex items-center gap-3">
             <Button
               variant="outline"
@@ -501,17 +521,17 @@ export default function ImportarCsv() {
           <input
             ref={fileRef}
             type="file"
-            accept=".csv,.txt"
+            accept=".csv,.txt,.xlsx,.xls"
             className="hidden"
             onChange={handleFile}
           />
           <p className="text-xs text-muted-foreground mt-1">
-            Aceita o relatório de pagamentos do Airbnb (colunas Tipo, Código de Confirmação, Data de início/término,
-            Noites, Hóspede, Anúncio, Valor, Pago, Taxa de serviço, Taxa de limpeza, Ganhos brutos) — pode conter
-            reservas de vários imóveis misturadas, identificadas pela coluna "Anúncio". As colunas Informações,
-            Código de referência, Moeda, Imposto repassado pelo Airbnb e Ganhos do ano são ignoradas. CPF/passaporte
-            e se o hóspede é estrangeiro não vêm no relatório — preencha manualmente depois, editando a reserva.
-            Separador: vírgula ou ponto-e-vírgula.
+            Aceita o relatório de pagamentos do Airbnb em CSV ou Excel (colunas Tipo, Código de Confirmação, Data de
+            início/término, Noites, Hóspede, Anúncio, Valor, Pago, Taxa de serviço, Taxa de limpeza, Ganhos brutos) —
+            pode conter reservas de vários imóveis misturadas, identificadas pela coluna "Anúncio". As colunas
+            Informações, Código de referência, Moeda, Imposto repassado pelo Airbnb e Ganhos do ano são ignoradas.
+            CPF/passaporte e se o hóspede é estrangeiro não vêm no relatório — preencha manualmente depois, editando
+            a reserva. No CSV, separador vírgula ou ponto-e-vírgula.
           </p>
         </div>
 
