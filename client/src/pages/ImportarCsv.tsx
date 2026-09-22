@@ -226,28 +226,41 @@ function splitCsvLine(line: string, sep: string): string[] {
   return result;
 }
 
-function parseCsv(text: string): { headers: string[]; rows: string[][] } {
+/** Lê um CSV como grade bruta (sem assumir onde fica o cabeçalho). */
+function csvToGrid(text: string): string[][] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
-  if (lines.length < 2) return { headers: [], rows: [] };
+  if (!lines.length) return [];
   const sep = lines[0].includes(";") ? ";" : ",";
-  const headers = splitCsvLine(lines[0], sep).map((h) => h.toLowerCase());
-  const rows = lines.slice(1).map((line) => splitCsvLine(line, sep));
-  return { headers, rows };
+  return lines.map((line) => splitCsvLine(line, sep));
 }
 
-/** Mesmo formato de saída de parseCsv, mas lendo a primeira planilha de um arquivo Excel (.xlsx/.xls). */
-function parseXlsx(data: ArrayBuffer): { headers: string[]; rows: string[][] } {
+/** Lê a primeira planilha de um arquivo Excel (.xlsx/.xls) como grade bruta. */
+function sheetToGrid(data: ArrayBuffer): string[][] {
   const wb = XLSX.read(data, { type: "array", cellDates: true });
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
-  if (aoa.length < 2) return { headers: [], rows: [] };
   const toStr = (v: unknown): string => {
     if (v instanceof Date) return v.toISOString().slice(0, 10);
     if (typeof v === "number") return String(v);
     return String(v ?? "").trim();
   };
-  const headers = aoa[0].map((h) => toStr(h).toLowerCase());
-  const rows = aoa.slice(1).map((r) => r.map(toStr));
+  return aoa.map((r) => r.map(toStr));
+}
+
+function parseCsv(text: string): { headers: string[]; rows: string[][] } {
+  const grid = csvToGrid(text);
+  if (grid.length < 2) return { headers: [], rows: [] };
+  const headers = grid[0].map((h) => h.toLowerCase());
+  const rows = grid.slice(1);
+  return { headers, rows };
+}
+
+/** Mesmo formato de saída de parseCsv, mas lendo a primeira planilha de um arquivo Excel (.xlsx/.xls). */
+function parseXlsx(data: ArrayBuffer): { headers: string[]; rows: string[][] } {
+  const grid = sheetToGrid(data);
+  if (grid.length < 2) return { headers: [], rows: [] };
+  const headers = grid[0].map((h) => h.toLowerCase());
+  const rows = grid.slice(1);
   return { headers, rows };
 }
 
@@ -323,12 +336,112 @@ function buildBaseRow(
   };
 }
 
+function normalizeHeader(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+}
+
+/** Datas "D/M/AAAA" de planilhas manuais em português: sempre dia/mês (BR), nunca mês/dia. */
+function parseBrDate(val: string): string | null {
+  const m = val.trim().match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!m) return null;
+  let day = parseInt(m[1], 10);
+  let month = parseInt(m[2], 10);
+  const year = parseInt(m[3], 10);
+  if (month > 12 && day <= 12) { const t = day; day = month; month = t; }
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function parseDocumentoManual(val: string): { cpfHospede?: string; passaporteHospede?: string; estrangeiro: boolean } {
+  const raw = (val || "").trim();
+  const estrangeiro = /passap|passport/i.test(raw);
+  const numero = raw.replace(/^(cpf|passap\w*|passport)[\s:.\-]*/i, "").trim();
+  return estrangeiro
+    ? { passaporteHospede: numero || undefined, estrangeiro: true }
+    : { cpfHospede: numero || undefined, estrangeiro: false };
+}
+
+function slug(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9]+/g, "").toUpperCase();
+}
+
+/**
+ * Formato "outros" — planilha feita à mão (não é o export oficial do Airbnb), sem colunas fixas:
+ * o cabeçalho real (Hóspede + Valor, no mínimo) pode não estar na primeira linha porque a planilha
+ * costuma ter um título acima. Sem taxas discriminadas (só o valor bruto/depositado) e sem código
+ * de reserva — o código é gerado a partir do hóspede + data de início, já que não existe no arquivo.
+ */
+function parseManual(grid: string[][], defaultFaxinas: number): { rows: CsvRow[]; errors: string[] } {
+  const errors: string[] = [];
+  let headerRowIdx = -1;
+  let colValor = -1, colHospede = -1, colDocumento = -1, colPeriodo = -1;
+  for (let i = 0; i < Math.min(grid.length, 6); i++) {
+    const norm = grid[i].map(normalizeHeader);
+    const iValor = norm.findIndex((h) => h.includes("valor"));
+    const iHospede = norm.findIndex((h) => h.includes("hospede") && !h.includes("cpf"));
+    if (iValor >= 0 && iHospede >= 0) {
+      headerRowIdx = i;
+      colValor = iValor;
+      colHospede = iHospede;
+      colDocumento = norm.findIndex((h) => h.includes("cpf") || h.includes("passa"));
+      colPeriodo = norm.findIndex((h) => h.includes("periodo"));
+      break;
+    }
+  }
+  if (headerRowIdx < 0) {
+    return { rows: [], errors: ["Não encontrei as colunas esperadas (Hóspede e Valor) nas primeiras linhas do arquivo."] };
+  }
+
+  const rows: CsvRow[] = [];
+  for (let i = headerRowIdx + 1; i < grid.length; i++) {
+    const line = grid[i];
+    const nomeHospede = (line[colHospede] || "").trim();
+    const valorBruto = parseCurrency(line[colValor] || "");
+    if (!nomeHospede || !valorBruto) continue; // linha vazia, TOTAL, etc.
+
+    const periodoRaw = colPeriodo >= 0 ? (line[colPeriodo] || "") : "";
+    const datas = periodoRaw.match(/\d{1,2}\/\d{1,2}\/\d{4}/g) || [];
+    const checkin = datas[0] ? parseBrDate(datas[0]) : null;
+    if (!checkin) {
+      errors.push(`Linha ${i + 1}: não consegui ler a data de início em "${periodoRaw || "(vazio)"}".`);
+      continue;
+    }
+    const checkoutBruto = datas[1] ? parseBrDate(datas[1]) : null;
+    const noites = checkoutBruto
+      ? Math.max(1, Math.round((new Date(checkoutBruto).getTime() - new Date(checkin).getTime()) / 86400000))
+      : 1;
+    const checkout = addDaysIso(checkin, noites);
+    const doc = parseDocumentoManual(colDocumento >= 0 ? (line[colDocumento] || "") : "");
+
+    rows.push({
+      codigo: `MANUAL-${checkin.replace(/-/g, "")}-${slug(nomeHospede).slice(0, 16)}`,
+      valorBruto,
+      taxaLimpeza: 0,
+      taxaAirbnb: 0,
+      outrasTaxas: 0,
+      valorLiquidoRecebido: valorBruto,
+      nomeHospede,
+      cpfHospede: doc.cpfHospede,
+      passaporteHospede: doc.passaporteHospede,
+      estrangeiro: doc.estrangeiro,
+      checkin,
+      checkout,
+      noites,
+      faxinasUtilizadas: defaultFaxinas,
+    });
+  }
+  return { rows, errors };
+}
+
 const SEM_ANUNCIO = "(sem anúncio informado)";
 
 export default function ImportarCsv() {
   const utils = trpc.useUtils();
   const { data: todosImoveis } = trpc.properties.list.useQuery();
   const imoveis = useMemo(() => (todosImoveis ?? []).filter((p) => p.tipoLocacao === "curta"), [todosImoveis]);
+  // "airbnb" = relatório oficial exportado pelo Airbnb; "manual" = qualquer outra planilha,
+  // sem colunas fixas nem código de reserva (ver parseManual).
+  const [formato, setFormato] = useState<"airbnb" | "manual">("airbnb");
   const [faxinasPadrao, setFaxinasPadrao] = useState("1");
   const [parsedRows, setParsedRows] = useState<CsvRow[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
@@ -352,6 +465,13 @@ export default function ImportarCsv() {
 
   const todosMapeados = anuncios.length > 0 && anuncios.every((a) => propertyMap[a.anuncio]);
 
+  function resetArquivo() {
+    setParsedRows([]);
+    setErrors([]);
+    setFileName("");
+    setPropertyMap({});
+  }
+
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -361,6 +481,15 @@ export default function ImportarCsv() {
     const isExcel = /\.xlsx?$/i.test(file.name);
     const reader = new FileReader();
     reader.onload = (ev) => {
+      if (formato === "manual") {
+        const grid = isExcel ? sheetToGrid(ev.target?.result as ArrayBuffer) : csvToGrid(ev.target?.result as string);
+        const defaultFax = Number(faxinasPadrao) || 1;
+        const { rows: manualRows, errors: manualErrs } = parseManual(grid, defaultFax);
+        setParsedRows(manualRows);
+        setErrors(manualErrs);
+        return;
+      }
+
       const { headers, rows } = isExcel
         ? parseXlsx(ev.target?.result as ArrayBuffer)
         : parseCsv(ev.target?.result as string);
@@ -486,6 +615,34 @@ export default function ImportarCsv() {
       />
 
       <Card className="p-6 space-y-5">
+        {/* Formato do arquivo */}
+        <div className="grid gap-1.5">
+          <Label>Formato do arquivo</Label>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={formato === "airbnb" ? "default" : "outline"}
+              className={formato !== "airbnb" ? "bg-background" : ""}
+              onClick={() => { setFormato("airbnb"); resetArquivo(); }}
+            >
+              Airbnb (oficial)
+            </Button>
+            <Button
+              type="button"
+              variant={formato === "manual" ? "default" : "outline"}
+              className={formato !== "manual" ? "bg-background" : ""}
+              onClick={() => { setFormato("manual"); resetArquivo(); }}
+            >
+              Outros formatos
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {formato === "airbnb"
+              ? "Para o relatório exportado direto pelo Airbnb (Ganhos → Relatórios de transações)."
+              : "Para planilhas próprias, sem o formato oficial — sem taxas discriminadas nem código de reserva."}
+          </p>
+        </div>
+
         {/* Faxinas padrão */}
         <div className="grid gap-1.5 max-w-xs">
           <Label>Faxinas por reserva (padrão)</Label>
@@ -526,12 +683,24 @@ export default function ImportarCsv() {
             onChange={handleFile}
           />
           <p className="text-xs text-muted-foreground mt-1">
-            Aceita o relatório de pagamentos do Airbnb em CSV ou Excel (colunas Tipo, Código de Confirmação, Data de
-            início/término, Noites, Hóspede, Anúncio, Valor, Pago, Taxa de serviço, Taxa de limpeza, Ganhos brutos) —
-            pode conter reservas de vários imóveis misturadas, identificadas pela coluna "Anúncio". As colunas
-            Informações, Código de referência, Moeda, Imposto repassado pelo Airbnb e Ganhos do ano são ignoradas.
-            CPF/passaporte e se o hóspede é estrangeiro não vêm no relatório — preencha manualmente depois, editando
-            a reserva. No CSV, separador vírgula ou ponto-e-vírgula.
+            {formato === "airbnb" ? (
+              <>
+                Aceita o relatório de pagamentos do Airbnb em CSV ou Excel (colunas Tipo, Código de Confirmação, Data
+                de início/término, Noites, Hóspede, Anúncio, Valor, Pago, Taxa de serviço, Taxa de limpeza, Ganhos
+                brutos) — pode conter reservas de vários imóveis misturadas, identificadas pela coluna "Anúncio". As
+                colunas Informações, Código de referência, Moeda, Imposto repassado pelo Airbnb e Ganhos do ano são
+                ignoradas. CPF/passaporte e se o hóspede é estrangeiro não vêm no relatório — preencha manualmente
+                depois, editando a reserva. No CSV, separador vírgula ou ponto-e-vírgula.
+              </>
+            ) : (
+              <>
+                Aceita qualquer planilha (CSV ou Excel) que tenha, no mínimo, uma coluna com o nome do hóspede, uma
+                com o valor e uma com o período da estadia (ex.: "02/08/2026 a 05/08/2026") — os nomes exatos das
+                colunas não importam. Uma coluna de CPF/passaporte também é reconhecida. Não há taxas discriminadas
+                (o valor da coluna é usado como bruto e líquido) nem código de reserva no arquivo — o código é
+                gerado automaticamente a partir do hóspede e da data.
+              </>
+            )}
           </p>
         </div>
 
