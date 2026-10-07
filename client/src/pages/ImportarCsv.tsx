@@ -44,10 +44,14 @@ interface CsvRow {
 type LogicalField =
   | "codigo" | "valorBruto" | "taxaLimpeza" | "taxaAirbnb" | "outrasTaxas"
   | "valorLiquidoRecebido" | "nomeHospede" | "checkin" | "checkout" | "noites"
-  | "tipoDoc" | "documento" | "pago" | "ganhosBrutos" | "anuncio";
+  | "tipoDoc" | "documento" | "pago" | "ganhosBrutos" | "anuncio" | "tipo";
 
 // Mapeamento flexível de colunas do CSV do Airbnb
 const COLUMN_MAP: Record<string, LogicalField> = {
+  // Tipo da linha (Reserva / Payout / Pagamento da Resolução / ...) — só linhas "Reserva"
+  // viram reserva; o resto é ignorado nessa etapa (ver filtro no loop principal).
+  "tipo": "tipo",
+  "type": "tipo",
   // Código da reserva
   "confirmation code": "codigo",
   "código de confirmação": "codigo",
@@ -516,6 +520,11 @@ export default function ImportarCsv() {
           grupos.push({ pago: pagoDesta, itens: [] });
           continue;
         }
+        // Linhas que não são "Reserva" (ex.: "Pagamento da Resolução", um ajuste avulso de
+        // uma reserva já existente) também têm código e valor preenchidos, mas não são uma
+        // reserva nova — incluí-las criava reservas fantasma com valor errado (só o ajuste,
+        // não o total). Quando o arquivo não tem coluna "Tipo", não filtra (compatibilidade).
+        if (fields.tipo && normalizeHeader(fields.tipo) !== "reserva") continue;
         const base = buildBaseRow(fields, defaultFax);
         if (base) {
           grupos[grupos.length - 1].itens.push(base);
@@ -562,7 +571,19 @@ export default function ImportarCsv() {
         }
       }
 
-      setParsedRows(mapped);
+      // Um mesmo código pode aparecer mais de uma vez no arquivo (ex.: um repasse parcial
+      // seguido de um repasse de ajuste/complemento da mesma reserva, cada um com seu próprio
+      // valor) — fica só a ocorrência de maior receita bruta, que é a versão completa/final;
+      // a(s) outra(s) seriam um valor parcial da mesma reserva, não uma reserva extra.
+      const porCodigo = new Map<string, CsvRow>();
+      for (const row of mapped) {
+        const atual = porCodigo.get(row.codigo);
+        if (!atual || row.valorBruto + row.taxaLimpeza > atual.valorBruto + atual.taxaLimpeza) {
+          porCodigo.set(row.codigo, row);
+        }
+      }
+
+      setParsedRows(Array.from(porCodigo.values()));
       setErrors(errs);
     };
     if (isExcel) reader.readAsArrayBuffer(file);
