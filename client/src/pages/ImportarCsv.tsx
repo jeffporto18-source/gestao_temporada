@@ -44,14 +44,10 @@ interface CsvRow {
 type LogicalField =
   | "codigo" | "valorBruto" | "taxaLimpeza" | "taxaAirbnb" | "outrasTaxas"
   | "valorLiquidoRecebido" | "nomeHospede" | "checkin" | "checkout" | "noites"
-  | "tipoDoc" | "documento" | "pago" | "ganhosBrutos" | "anuncio" | "tipo";
+  | "tipoDoc" | "documento" | "pago" | "ganhosBrutos" | "anuncio";
 
 // Mapeamento flexível de colunas do CSV do Airbnb
 const COLUMN_MAP: Record<string, LogicalField> = {
-  // Tipo da linha (Reserva / Payout / Pagamento da Resolução / ...) — só linhas "Reserva"
-  // viram reserva; o resto é ignorado nessa etapa (ver filtro no loop principal).
-  "tipo": "tipo",
-  "type": "tipo",
   // Código da reserva
   "confirmation code": "codigo",
   "código de confirmação": "codigo",
@@ -520,11 +516,6 @@ export default function ImportarCsv() {
           grupos.push({ pago: pagoDesta, itens: [] });
           continue;
         }
-        // Linhas que não são "Reserva" (ex.: "Pagamento da Resolução", um ajuste avulso de
-        // uma reserva já existente) também têm código e valor preenchidos, mas não são uma
-        // reserva nova — incluí-las criava reservas fantasma com valor errado (só o ajuste,
-        // não o total). Quando o arquivo não tem coluna "Tipo", não filtra (compatibilidade).
-        if (fields.tipo && normalizeHeader(fields.tipo) !== "reserva") continue;
         const base = buildBaseRow(fields, defaultFax);
         if (base) {
           grupos[grupos.length - 1].itens.push(base);
@@ -571,19 +562,21 @@ export default function ImportarCsv() {
         }
       }
 
-      // Um mesmo código pode aparecer mais de uma vez no arquivo (ex.: um repasse parcial
-      // seguido de um repasse de ajuste/complemento da mesma reserva, cada um com seu próprio
-      // valor) — fica só a ocorrência de maior receita bruta, que é a versão completa/final;
-      // a(s) outra(s) seriam um valor parcial da mesma reserva, não uma reserva extra.
-      const porCodigo = new Map<string, CsvRow>();
-      for (const row of mapped) {
-        const atual = porCodigo.get(row.codigo);
-        if (!atual || row.valorBruto + row.taxaLimpeza > atual.valorBruto + atual.taxaLimpeza) {
-          porCodigo.set(row.codigo, row);
-        }
-      }
+      // Um mesmo código pode aparecer mais de uma vez no arquivo — o Airbnb paga em repasses
+      // separados quando a estadia é estendida, ou quando há um ajuste/resolução à parte do
+      // repasse original. Cada ocorrência é um depósito distinto (precisa bater com o extrato
+      // bancário na conciliação), então cada uma vira sua própria reserva — a partir da 2ª
+      // ocorrência, o código ganha um sufixo -2, -3 etc. Isso também mantém reimportar o mesmo
+      // arquivo seguro: os sufixos saem sempre na mesma ordem, então a proteção contra
+      // duplicata (que compara pelo código) continua reconhecendo o que já foi importado.
+      const ocorrenciasPorCodigo = new Map<string, number>();
+      const comCodigoUnico = mapped.map((row) => {
+        const vistas = (ocorrenciasPorCodigo.get(row.codigo) ?? 0) + 1;
+        ocorrenciasPorCodigo.set(row.codigo, vistas);
+        return vistas === 1 ? row : { ...row, codigo: `${row.codigo}-${vistas}` };
+      });
 
-      setParsedRows(Array.from(porCodigo.values()));
+      setParsedRows(comCodigoUnico);
       setErrors(errs);
     };
     if (isExcel) reader.readAsArrayBuffer(file);

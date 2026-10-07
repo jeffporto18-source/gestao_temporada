@@ -1873,7 +1873,10 @@ export const appRouter = router({
         let importadas = 0;
 
         // Reimportar o mesmo arquivo (ou clicar "Importar" duas vezes) não pode duplicar reservas —
-        // pula qualquer código que já exista neste imóvel.
+        // pula qualquer código que já exista neste imóvel. Quando o mesmo código aparece mais de
+        // uma vez no CSV (repasses separados da mesma reserva — estadia estendida, resolução),
+        // o cliente já desambiguou com sufixo -2, -3 etc. antes de enviar, então cada repasse chega
+        // aqui com um código próprio e vira sua própria reserva.
         const existentes = await db.listReservations(ctx.ownerId, input.propertyId);
         const codigosExistentes = new Set(existentes.map((r) => r.codigo));
 
