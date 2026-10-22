@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, Building2, Receipt, BookOpen, CalendarDays, FileText, BarChart3, Upload, UserCog, UsersRound, Landmark, UserCog2, FileSignature, Package, Wallet, TrendingUp, Truck, PieChart, ClipboardList, ClipboardCheck, ScrollText, UserRound, ShieldCheck, Banknote, Archive } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, Building2, Receipt, BookOpen, CalendarDays, FileText, BarChart3, Upload, UserCog, UsersRound, Landmark, UserCog2, FileSignature, Package, Wallet, TrendingUp, Truck, PieChart, ClipboardList, ClipboardCheck, ScrollText, UserRound, ShieldCheck, Banknote, Archive, IdCard } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -58,6 +58,7 @@ const allMenuItems = [
   { icon: FileText, label: "Informe de IR", path: "/informe-ir", hideFor: [] as string[], somenteTotal: true },
   { icon: FileText, label: "Repasse ao Proprietário", path: "/repasse", hideFor: ["holding"], somenteTotal: true },
   { icon: Upload, label: "Importar CSV", path: "/importar", hideFor: [] as string[] },
+  { icon: IdCard, label: "Importar CPF/Passaporte", path: "/importar-documentos", hideFor: [] as string[] },
   { icon: UsersRound, label: "Usuários", path: "/usuarios", hideFor: [] as string[], somenteDono: true },
   { icon: ShieldCheck, label: "Escritório", path: "/escritorio", hideFor: [] as string[], somenteAdmin: true },
   { icon: UserRound, label: "Sócios", path: "/socios", hideFor: [] as string[] },

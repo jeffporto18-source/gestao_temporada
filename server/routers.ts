@@ -1841,6 +1841,48 @@ export const appRouter = router({
         }),
       ),
 
+    /**
+     * Preenche CPF/passaporte de reservas já existentes, casando pelo código — o relatório do
+     * Airbnb não traz esse dado, então ele costuma ser completado depois, em lote, a partir dos
+     * documentos dos hóspedes. Não cria reserva nova; código que não bate com nenhuma reserva
+     * do owner (qualquer imóvel) volta na lista de não encontrados pro usuário conferir.
+     */
+    importDocumentos: escritaProcedure
+      .input(
+        z.object({
+          rows: z.array(
+            z.object({
+              codigo: z.string(),
+              cpfHospede: z.string().optional(),
+              passaporteHospede: z.string().optional(),
+              estrangeiro: z.boolean().default(false),
+            }),
+          ),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const todas = await db.listReservations(ctx.ownerId);
+        const porCodigo = new Map(todas.map((r) => [r.codigo, r]));
+        let atualizadas = 0;
+        const naoEncontradas: string[] = [];
+
+        for (const row of input.rows) {
+          const reserva = porCodigo.get(row.codigo);
+          if (!reserva) {
+            naoEncontradas.push(row.codigo);
+            continue;
+          }
+          await db.updateReservation(ctx.ownerId, reserva.id, {
+            cpfHospede: row.cpfHospede || null,
+            passaporteHospede: row.passaporteHospede || null,
+            estrangeiro: row.estrangeiro ? 1 : 0,
+          });
+          atualizadas++;
+        }
+
+        return { atualizadas, naoEncontradas };
+      }),
+
     // Importação de CSV do Airbnb
     importCsv: escritaProcedure
       .input(

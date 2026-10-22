@@ -32,6 +32,7 @@ import Dimob from "./pages/Dimob";
 import InformeIr from "./pages/InformeIr";
 import Repasse from "./pages/Repasse";
 import ImportarCsv from "./pages/ImportarCsv";
+import ImportarDocumentos from "./pages/ImportarDocumentos";
 import Onboarding from "./pages/Onboarding";
 import Perfil from "./pages/Perfil";
 import Usuarios from "./pages/Usuarios";
@@ -230,6 +231,11 @@ function App() {
             <Route path="/importar">
               <RequireAuth>
                 <DashboardLayout><ImportarCsv /></DashboardLayout>
+              </RequireAuth>
+            </Route>
+            <Route path="/importar-documentos">
+              <RequireAuth>
+                <DashboardLayout><ImportarDocumentos /></DashboardLayout>
               </RequireAuth>
             </Route>
             <Route path="/perfil">
