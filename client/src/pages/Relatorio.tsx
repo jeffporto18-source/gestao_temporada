@@ -21,7 +21,7 @@ import {
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Circle, CheckCircle2, Ban, RotateCcw, Paperclip, ExternalLink, Loader2, Printer, FileSpreadsheet } from "lucide-react";
-import { brl, formatDate, formatCompetencia } from "@/lib/format";
+import { brl, formatDate, formatCompetencia, formatCpfCnpj } from "@/lib/format";
 import { PageHeader, EmptyState, SkeletonList } from "./Clientes";
 import { useAuth } from "@/_core/hooks/useAuth";
 import * as XLSX from "xlsx";
@@ -237,12 +237,16 @@ export default function Relatorio() {
     }));
     const linhasReservas = reservas.map((r) => {
       const previsto = Number(r.valorLiquidoRecebido) || Number(r.valorBruto) + Number(r.taxaLimpeza);
+      const documento = r.estrangeiro
+        ? (r.passaporteHospede ? `Passaporte ${r.passaporteHospede}` : "—")
+        : (r.cpfHospede ? formatCpfCnpj(r.cpfHospede) : "—");
       return {
         Tipo: "Aluguel — curta duração",
         Competência: formatCompetencia(r.competencia),
         Imóvel: nomeImovel(r.propertyId),
         Descrição: `Aluguel · ${r.codigo}`,
         Contraparte: r.nomeHospede || "—",
+        "CPF/Passaporte": documento,
         Vencimento: formatDate(r.checkin),
         Valor: previsto,
         Situação: r.dataRecebimento ? "Baixado" : "Em aberto",
@@ -546,13 +550,17 @@ function ParcelaLabel({ parcela, nomeImovel, nomeInquilino, pago }: { parcela: P
 
 function ReservaLabel({ reserva, nomeImovel, pago }: { reserva: Reserva; nomeImovel: string; pago?: boolean }) {
   const previsto = Number(reserva.valorLiquidoRecebido) || Number(reserva.valorBruto) + Number(reserva.taxaLimpeza);
+  const documento = reserva.estrangeiro
+    ? (reserva.passaporteHospede ? `Passaporte ${reserva.passaporteHospede}` : null)
+    : (reserva.cpfHospede ? `CPF ${formatCpfCnpj(reserva.cpfHospede)}` : null);
+  const hospede = [reserva.nomeHospede, documento].filter(Boolean).join(" · ");
   return (
     <span className="min-w-0">
       <span className="font-medium truncate block">{nomeImovel} — Aluguel (curta duração) · {reserva.codigo}</span>
       <span className="text-[11px] text-muted-foreground block">
         {pago
-          ? `Recebido ${reserva.dataRecebimento ? formatDate(reserva.dataRecebimento) : "—"} · ${brl(reserva.valorRecebido ?? previsto)}${reserva.nomeHospede ? ` · ${reserva.nomeHospede}` : ""}`
-          : `Check-in ${formatDate(reserva.checkin)} · ${brl(previsto)}${reserva.nomeHospede ? ` · ${reserva.nomeHospede}` : ""}`}
+          ? `Recebido ${reserva.dataRecebimento ? formatDate(reserva.dataRecebimento) : "—"} · ${brl(reserva.valorRecebido ?? previsto)}${hospede ? ` · ${hospede}` : ""}`
+          : `Check-in ${formatDate(reserva.checkin)} · ${brl(previsto)}${hospede ? ` · ${hospede}` : ""}`}
       </span>
     </span>
   );
