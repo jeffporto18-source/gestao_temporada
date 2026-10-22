@@ -27,10 +27,16 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import * as XLSX from "xlsx";
 
 type Charge = RouterOutputs["ledgerCharges"]["list"][number];
+type Parcela = RouterOutputs["longTermContracts"]["charges"][number];
+type Reserva = RouterOutputs["reservations"]["list"][number];
 type Tipo = "" | "despesa" | "receita" | "aporte" | "repasse";
 type Situacao = "" | "aberto" | "pago" | "cancelado";
 
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+function round2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
 
 function anosDisponiveis(): number[] {
   const atual = new Date().getFullYear();
@@ -76,12 +82,21 @@ export default function Relatorio() {
   const [situacao, setSituacao] = useState<Situacao>("");
   const [propertyId, setPropertyId] = useState<string>("");
   const [baixando, setBaixando] = useState<Charge | null>(null);
+  const [baixandoParcela, setBaixandoParcela] = useState<Parcela | null>(null);
+  const [baixandoReserva, setBaixandoReserva] = useState<Reserva | null>(null);
 
   const { data: chargesRaw, isLoading } = trpc.ledgerCharges.list.useQuery({
     propertyId: propertyId ? Number(propertyId) : undefined,
   });
+  // Aluguéis de longa e curta duração não nascem como ledgerCharges — a baixa deles mora em
+  // contract_rent_charges e em reservations, respectivamente (ver Contratos/Reservas). Traz os
+  // dois aqui pra aparecerem no mesmo relatório mês a mês, com baixa própria.
+  const { data: parcelasRaw, isLoading: isLoadingParcelas } = trpc.longTermContracts.charges.useQuery({});
+  const { data: contratos } = trpc.longTermContracts.list.useQuery({});
+  const { data: reservasRaw, isLoading: isLoadingReservas } = trpc.reservations.list.useQuery({});
 
   const nomeImovel = (id: number | null) => (id === null ? "Empresa" : imoveis?.find((p) => p.id === id)?.apelido ?? "—");
+  const nomeInquilino = (contractId: number) => contratos?.find((c) => c.id === contractId)?.nomeInquilino || "Inquilino";
 
   const reabrir = trpc.ledgerCharges.reabrir.useMutation({
     onSuccess: () => { utils.ledgerCharges.list.invalidate(); toast.success("Movido de volta para em aberto."); },
@@ -89,6 +104,10 @@ export default function Relatorio() {
   });
   const cancelar = trpc.ledgerCharges.cancelar.useMutation({
     onSuccess: () => { utils.ledgerCharges.list.invalidate(); toast.success("Mês cancelado."); },
+    onError: (e) => toast.error(e.message),
+  });
+  const reabrirParcela = trpc.longTermContracts.markPending.useMutation({
+    onSuccess: () => { utils.longTermContracts.charges.invalidate(); toast.success("Movido de volta para em aberto."); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -107,43 +126,90 @@ export default function Relatorio() {
     [chargesRaw, tipo, situacao, de, ate],
   );
 
-  const totais = useMemo(
+  // Aluguéis de longa e curta duração só entram quando o filtro de Tipo permite receita — eles
+  // não têm estado "cancelado" (só em aberto/baixado), então o filtro de Situação "cancelado"
+  // os deixa de fora.
+  const mostraAlugueis = tipo === "" || tipo === "receita";
+  const parcelas = useMemo(
     () =>
-      charges.reduce(
-        (acc, c) => {
-          if (c.status === "cancelado") return acc;
-          const valor = c.status === "pago" ? Number(c.valorPago ?? c.valor) : Number(c.valor);
-          if (c.grupo === "receita") acc.receita += valor;
-          else if (c.grupo === "aporte_capital") acc.aporte += valor;
-          else if (c.grupo === "repasse_caucao") acc.repasse += valor;
-          else acc.despesa += valor;
-          return acc;
-        },
-        { receita: 0, despesa: 0, aporte: 0, repasse: 0 },
-      ),
-    [charges],
+      !mostraAlugueis
+        ? []
+        : (parcelasRaw ?? []).filter((p) => {
+            if (propertyId && p.propertyId !== Number(propertyId)) return false;
+            if (p.competencia < de || p.competencia > ate) return false;
+            const statusMapeado = p.status === "recebido" ? "pago" : "aberto";
+            if (situacao && situacao !== statusMapeado) return false;
+            return true;
+          }),
+    [parcelasRaw, mostraAlugueis, propertyId, de, ate, situacao],
   );
+  const reservas = useMemo(
+    () =>
+      !mostraAlugueis
+        ? []
+        : (reservasRaw ?? []).filter((r) => {
+            if (propertyId && r.propertyId !== Number(propertyId)) return false;
+            if (r.competencia < de || r.competencia > ate) return false;
+            const statusMapeado = r.dataRecebimento ? "pago" : "aberto";
+            if (situacao && situacao !== statusMapeado) return false;
+            return true;
+          }),
+    [reservasRaw, mostraAlugueis, propertyId, de, ate, situacao],
+  );
+
+  const totais = useMemo(() => {
+    const acc = charges.reduce(
+      (acc, c) => {
+        if (c.status === "cancelado") return acc;
+        const valor = c.status === "pago" ? Number(c.valorPago ?? c.valor) : Number(c.valor);
+        if (c.grupo === "receita") acc.receita += valor;
+        else if (c.grupo === "aporte_capital") acc.aporte += valor;
+        else if (c.grupo === "repasse_caucao") acc.repasse += valor;
+        else acc.despesa += valor;
+        return acc;
+      },
+      { receita: 0, despesa: 0, aporte: 0, repasse: 0 },
+    );
+    for (const p of parcelas) {
+      acc.receita += p.status === "recebido" ? Number(p.valorRecebido ?? p.valor) : Number(p.valor);
+    }
+    for (const r of reservas) {
+      const previsto = Number(r.valorLiquidoRecebido) || Number(r.valorBruto) + Number(r.taxaLimpeza);
+      acc.receita += r.dataRecebimento ? Number(r.valorRecebido ?? previsto) : previsto;
+    }
+    return acc;
+  }, [charges, parcelas, reservas]);
   const resultado = totais.receita - totais.despesa;
 
   const grupos = useMemo(() => {
-    const mapa = new Map<string, Charge[]>();
-    for (const c of charges) {
-      if (!mapa.has(c.competencia)) mapa.set(c.competencia, []);
-      mapa.get(c.competencia)!.push(c);
-    }
-    return Array.from(mapa.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([competencia, itens]) => ({
-        competencia,
-        abertos: itens.filter((c) => c.status === "aberto").sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento)),
-        pagos: itens.filter((c) => c.status === "pago").sort((a, b) => (b.dataPagamento ?? "").localeCompare(a.dataPagamento ?? "")),
-        cancelados: itens.filter((c) => c.status === "cancelado"),
-      }));
-  }, [charges]);
+    const competencias = new Set<string>();
+    for (const c of charges) competencias.add(c.competencia);
+    for (const p of parcelas) competencias.add(p.competencia);
+    for (const r of reservas) competencias.add(r.competencia);
+
+    return Array.from(competencias)
+      .sort()
+      .map((competencia) => {
+        const itensCharges = charges.filter((c) => c.competencia === competencia);
+        const itensParcelas = parcelas.filter((p) => p.competencia === competencia);
+        const itensReservas = reservas.filter((r) => r.competencia === competencia);
+        return {
+          competencia,
+          abertos: itensCharges.filter((c) => c.status === "aberto").sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento)),
+          pagos: itensCharges.filter((c) => c.status === "pago").sort((a, b) => (b.dataPagamento ?? "").localeCompare(a.dataPagamento ?? "")),
+          cancelados: itensCharges.filter((c) => c.status === "cancelado"),
+          parcelasAbertas: itensParcelas.filter((p) => p.status === "pendente").sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento)),
+          parcelasPagas: itensParcelas.filter((p) => p.status === "recebido").sort((a, b) => (b.dataRecebimento ?? "").localeCompare(a.dataRecebimento ?? "")),
+          reservasAbertas: itensReservas.filter((r) => !r.dataRecebimento).sort((a, b) => a.checkin.localeCompare(b.checkin)),
+          reservasPagas: itensReservas.filter((r) => !!r.dataRecebimento).sort((a, b) => (b.dataRecebimento ?? "").localeCompare(a.dataRecebimento ?? "")),
+        };
+      });
+  }, [charges, parcelas, reservas]);
 
   function baixarExcel() {
-    const linhas = charges.map((c) => {
+    const linhasManuais = charges.map((c) => {
       const linha: Record<string, string | number> = {
+        Tipo: "Lançamento manual",
         Competência: formatCompetencia(c.competencia),
         Imóvel: nomeImovel(c.propertyId),
         Descrição: c.descricao || c.categoria || "—",
@@ -157,9 +223,37 @@ export default function Relatorio() {
       if (isContabilidade) linha["Código Contábil"] = c.codigoContabil || "—";
       return linha;
     });
+    const linhasParcelas = parcelas.map((p) => ({
+      Tipo: "Aluguel — longa duração",
+      Competência: formatCompetencia(p.competencia),
+      Imóvel: nomeImovel(p.propertyId),
+      Descrição: "Aluguel",
+      Contraparte: nomeInquilino(p.contractId),
+      Vencimento: formatDate(p.dataVencimento),
+      Valor: Number(p.valor),
+      Situação: p.status === "recebido" ? "Baixado" : "Em aberto",
+      "Data pagamento": p.dataRecebimento ? formatDate(p.dataRecebimento) : "—",
+      "Valor pago": p.valorRecebido ? Number(p.valorRecebido) : "—",
+    }));
+    const linhasReservas = reservas.map((r) => {
+      const previsto = Number(r.valorLiquidoRecebido) || Number(r.valorBruto) + Number(r.taxaLimpeza);
+      return {
+        Tipo: "Aluguel — curta duração",
+        Competência: formatCompetencia(r.competencia),
+        Imóvel: nomeImovel(r.propertyId),
+        Descrição: `Aluguel · ${r.codigo}`,
+        Contraparte: r.nomeHospede || "—",
+        Vencimento: formatDate(r.checkin),
+        Valor: previsto,
+        Situação: r.dataRecebimento ? "Baixado" : "Em aberto",
+        "Data pagamento": r.dataRecebimento ? formatDate(r.dataRecebimento) : "—",
+        "Valor pago": r.valorRecebido ? Number(r.valorRecebido) : "—",
+      };
+    });
+    const linhas = [...linhasManuais, ...linhasParcelas, ...linhasReservas];
     const ws = XLSX.utils.json_to_sheet(linhas);
     ws["!cols"] = [
-      { wch: 14 }, { wch: 22 }, { wch: 30 }, { wch: 22 }, { wch: 12 },
+      { wch: 22 }, { wch: 14 }, { wch: 22 }, { wch: 30 }, { wch: 22 }, { wch: 12 },
       { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
     ];
     const wb = XLSX.utils.book_new();
@@ -296,7 +390,7 @@ export default function Relatorio() {
         </div>
       </Card>
 
-      {isLoading ? (
+      {isLoading || isLoadingParcelas || isLoadingReservas ? (
         <SkeletonList />
       ) : !grupos.length ? (
         <EmptyState title="Nada por aqui" subtitle="Cadastre contas em Contas a Pagar, Contas a Receber, Aportes ou Repasse de Caução para elas aparecerem aqui mês a mês." />
@@ -359,12 +453,61 @@ export default function Relatorio() {
                   ))}
                 </div>
               )}
+
+              {(g.parcelasAbertas.length > 0 || g.parcelasPagas.length > 0) && (
+                <div className="border-t border-border">
+                  <p className="px-3 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Aluguéis — Longa duração</p>
+                  {g.parcelasAbertas.map((p) => (
+                    <ChargeRow key={p.id}>
+                      <button className="flex items-center gap-1.5 min-w-0 text-left" onClick={() => setBaixandoParcela(p)} title="Marcar como recebido">
+                        <Circle className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <ParcelaLabel parcela={p} nomeImovel={nomeImovel(p.propertyId)} nomeInquilino={nomeInquilino(p.contractId)} />
+                      </button>
+                    </ChargeRow>
+                  ))}
+                  {g.parcelasPagas.map((p) => (
+                    <ChargeRow key={p.id} tom="bg-primary/5">
+                      <button className="flex items-center gap-1.5 min-w-0 text-left" onClick={() => reabrirParcela.mutate({ id: p.id })} title="Voltar para em aberto">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                        <ParcelaLabel parcela={p} nomeImovel={nomeImovel(p.propertyId)} nomeInquilino={nomeInquilino(p.contractId)} pago />
+                      </button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary shrink-0" onClick={() => reabrirParcela.mutate({ id: p.id })} title="Reabrir">
+                        <RotateCcw className="h-3 w-3" />
+                      </Button>
+                    </ChargeRow>
+                  ))}
+                </div>
+              )}
+
+              {(g.reservasAbertas.length > 0 || g.reservasPagas.length > 0) && (
+                <div className="border-t border-border">
+                  <p className="px-3 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Aluguéis — Curta duração (Airbnb)</p>
+                  {g.reservasAbertas.map((r) => (
+                    <ChargeRow key={r.id}>
+                      <button className="flex items-center gap-1.5 min-w-0 text-left" onClick={() => setBaixandoReserva(r)} title="Marcar como recebido">
+                        <Circle className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <ReservaLabel reserva={r} nomeImovel={nomeImovel(r.propertyId)} />
+                      </button>
+                    </ChargeRow>
+                  ))}
+                  {g.reservasPagas.map((r) => (
+                    <ChargeRow key={r.id} tom="bg-primary/5">
+                      <button className="flex items-center gap-1.5 min-w-0 text-left" onClick={() => setBaixandoReserva(r)} title="Ajustar recebimento">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                        <ReservaLabel reserva={r} nomeImovel={nomeImovel(r.propertyId)} pago />
+                      </button>
+                    </ChargeRow>
+                  ))}
+                </div>
+              )}
             </Card>
           ))}
         </div>
       )}
 
       <BaixaDialog charge={baixando} onOpenChange={(o) => !o && setBaixando(null)} />
+      <BaixaParcelaDialog parcela={baixandoParcela} onOpenChange={(o) => !o && setBaixandoParcela(null)} />
+      <BaixaReservaDialog reserva={baixandoReserva} onOpenChange={(o) => !o && setBaixandoReserva(null)} />
     </div>
   );
 }
@@ -383,6 +526,33 @@ function RowLabel({ charge, nomeImovel, pago, mostrarCodigo }: { charge: Charge;
         {pago
           ? `${entrada ? "Recebido" : "Pago"} ${charge.dataPagamento ? formatDate(charge.dataPagamento) : "—"} · ${brl(charge.valorPago ?? charge.valor)}`
           : `Vence ${formatDate(charge.dataVencimento)} · ${brl(charge.valor)}${charge.contraparte ? ` · ${charge.contraparte}` : ""}`}
+      </span>
+    </span>
+  );
+}
+
+function ParcelaLabel({ parcela, nomeImovel, nomeInquilino, pago }: { parcela: Parcela; nomeImovel: string; nomeInquilino: string; pago?: boolean }) {
+  return (
+    <span className="min-w-0">
+      <span className="font-medium truncate block">{nomeImovel} — Aluguel (longa duração)</span>
+      <span className="text-[11px] text-muted-foreground block">
+        {pago
+          ? `Recebido ${parcela.dataRecebimento ? formatDate(parcela.dataRecebimento) : "—"} · ${brl(parcela.valorRecebido ?? parcela.valor)} · ${nomeInquilino}`
+          : `Vence ${formatDate(parcela.dataVencimento)} · ${brl(parcela.valor)} · ${nomeInquilino}`}
+      </span>
+    </span>
+  );
+}
+
+function ReservaLabel({ reserva, nomeImovel, pago }: { reserva: Reserva; nomeImovel: string; pago?: boolean }) {
+  const previsto = Number(reserva.valorLiquidoRecebido) || Number(reserva.valorBruto) + Number(reserva.taxaLimpeza);
+  return (
+    <span className="min-w-0">
+      <span className="font-medium truncate block">{nomeImovel} — Aluguel (curta duração) · {reserva.codigo}</span>
+      <span className="text-[11px] text-muted-foreground block">
+        {pago
+          ? `Recebido ${reserva.dataRecebimento ? formatDate(reserva.dataRecebimento) : "—"} · ${brl(reserva.valorRecebido ?? previsto)}${reserva.nomeHospede ? ` · ${reserva.nomeHospede}` : ""}`
+          : `Check-in ${formatDate(reserva.checkin)} · ${brl(previsto)}${reserva.nomeHospede ? ` · ${reserva.nomeHospede}` : ""}`}
       </span>
     </span>
   );
@@ -506,6 +676,129 @@ function BaixaDialog({ charge, onOpenChange }: { charge: Charge | null; onOpenCh
         <DialogFooter>
           <Button variant="outline" className="bg-background" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button onClick={confirmar} disabled={pagar.isPending}>Confirmar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function BaixaParcelaDialog({ parcela, onOpenChange }: { parcela: Parcela | null; onOpenChange: (open: boolean) => void }) {
+  const utils = trpc.useUtils();
+  const [valor, setValor] = useState("");
+  const [data, setData] = useState("");
+  const idRef = useRef<number | null>(null);
+
+  if (parcela && idRef.current !== parcela.id) {
+    idRef.current = parcela.id;
+    setValor(String(Number(parcela.valorRecebido ?? parcela.valor)));
+    setData(parcela.dataRecebimento || new Date().toISOString().slice(0, 10));
+  }
+  if (!parcela && idRef.current !== null) idRef.current = null;
+
+  const markReceived = trpc.longTermContracts.markReceived.useMutation({
+    onSuccess: () => { utils.longTermContracts.charges.invalidate(); onOpenChange(false); toast.success("Recebimento confirmado."); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const confirmar = () => {
+    if (!parcela) return;
+    const v = Number(valor);
+    if (!v || v <= 0) { toast.error("Informe o valor."); return; }
+    if (!data) { toast.error("Informe a data."); return; }
+    const base = Number(parcela.valor);
+    markReceived.mutate({
+      id: parcela.id,
+      dataRecebimento: data,
+      multaJuros: Math.max(0, round2(v - base)),
+      desconto: Math.max(0, round2(base - v)),
+    });
+  };
+
+  return (
+    <Dialog open={parcela !== null} onOpenChange={(o) => !o && onOpenChange(false)}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="font-serif">Marcar como recebido</DialogTitle>
+        </DialogHeader>
+        {parcela && (
+          <div className="grid gap-3 py-2">
+            <div className="rounded-lg border border-border bg-secondary/50 px-3 py-2">
+              <p className="text-sm font-medium">Aluguel (longa duração) — {formatCompetencia(parcela.competencia)}</p>
+              <p className="text-xs text-muted-foreground">Vencimento {formatDate(parcela.dataVencimento)} · Previsto {brl(parcela.valor)}</p>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Valor recebido (R$)</Label>
+              <Input autoFocus value={valor} onChange={(e) => setValor(e.target.value)} type="number" step="0.01" min="0" />
+              <p className="text-[11px] text-muted-foreground">Diferente do previsto vira multa/juros (a mais) ou desconto (a menos) automaticamente.</p>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Data</Label>
+              <DateInput value={data} onChange={setData} />
+            </div>
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" className="bg-background" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={confirmar} disabled={markReceived.isPending}>Confirmar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function BaixaReservaDialog({ reserva, onOpenChange }: { reserva: Reserva | null; onOpenChange: (open: boolean) => void }) {
+  const utils = trpc.useUtils();
+  const [valor, setValor] = useState("");
+  const [data, setData] = useState("");
+  const idRef = useRef<number | null>(null);
+
+  const previsto = reserva ? Number(reserva.valorLiquidoRecebido) || Number(reserva.valorBruto) + Number(reserva.taxaLimpeza) : 0;
+
+  if (reserva && idRef.current !== reserva.id) {
+    idRef.current = reserva.id;
+    setValor(String(Number(reserva.valorRecebido ?? previsto)));
+    setData(reserva.dataRecebimento || new Date().toISOString().slice(0, 10));
+  }
+  if (!reserva && idRef.current !== null) idRef.current = null;
+
+  const marcarRecebimento = trpc.reservations.marcarRecebimento.useMutation({
+    onSuccess: () => { utils.reservations.list.invalidate(); onOpenChange(false); toast.success("Recebimento confirmado."); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const confirmar = () => {
+    if (!reserva) return;
+    const v = Number(valor);
+    if (!v || v <= 0) { toast.error("Informe o valor."); return; }
+    if (!data) { toast.error("Informe a data."); return; }
+    marcarRecebimento.mutate({ id: reserva.id, dataRecebimento: data, valorRecebido: v });
+  };
+
+  return (
+    <Dialog open={reserva !== null} onOpenChange={(o) => !o && onOpenChange(false)}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="font-serif">Marcar como recebido</DialogTitle>
+        </DialogHeader>
+        {reserva && (
+          <div className="grid gap-3 py-2">
+            <div className="rounded-lg border border-border bg-secondary/50 px-3 py-2">
+              <p className="text-sm font-medium">Aluguel (curta duração) — {reserva.codigo}</p>
+              <p className="text-xs text-muted-foreground">Check-in {formatDate(reserva.checkin)} · Previsto {brl(previsto)}</p>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Valor recebido (R$)</Label>
+              <Input autoFocus value={valor} onChange={(e) => setValor(e.target.value)} type="number" step="0.01" min="0" />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Data</Label>
+              <DateInput value={data} onChange={setData} />
+            </div>
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" className="bg-background" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={confirmar} disabled={marcarRecebimento.isPending}>Confirmar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
