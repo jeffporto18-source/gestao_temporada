@@ -44,7 +44,7 @@ interface CsvRow {
 type LogicalField =
   | "codigo" | "valorBruto" | "taxaLimpeza" | "taxaAirbnb" | "outrasTaxas"
   | "valorLiquidoRecebido" | "nomeHospede" | "checkin" | "checkout" | "noites"
-  | "tipoDoc" | "documento" | "pago" | "ganhosBrutos" | "anuncio";
+  | "tipoDoc" | "documento" | "pago" | "ganhosBrutos" | "anuncio" | "dataReserva";
 
 // Mapeamento flexível de colunas do CSV do Airbnb
 const COLUMN_MAP: Record<string, LogicalField> = {
@@ -126,6 +126,11 @@ const COLUMN_MAP: Record<string, LogicalField> = {
   "data de saida": "checkout",
   "data de término": "checkout",
   "fim": "checkout",
+  // Data da reserva — em alguns exports do Airbnb é a data em que a reserva foi
+  // FEITA (não o check-in), mas há um formato de export sem "Data de início"/
+  // "Data de término" nenhuma, só esta coluna + "Noites"; nesse caso ela serve
+  // como check-in (ver fallback em buildBaseRow).
+  "data da reserva": "dataReserva",
   // Noites
   "nights": "noites",
   "noites": "noites",
@@ -289,7 +294,17 @@ function buildBaseRow(
   if (!codigo || !valorBruto) return null;
 
   const noites = fields.noites ? parseInt(fields.noites, 10) || 0 : 0;
-  const checkin = fields.checkin ? parseDate(fields.checkin) : null;
+  // Alguns exports do Airbnb não trazem "Data de início"/"Data de término" — só
+  // "Data da reserva" + "Noites". Nesse caso "Data da reserva" funciona como o
+  // check-in (confirmado comparando estadias consecutivas do mesmo hóspede: o
+  // fim de uma bate exatamente com o início da próxima). Quando o arquivo TEM
+  // "Data de início" de verdade, ela manda, e "Data da reserva" (a data em que a
+  // reserva foi feita, diferente do check-in) é ignorada.
+  const checkin = fields.checkin
+    ? parseDate(fields.checkin)
+    : fields.dataReserva
+      ? parseDate(fields.dataReserva)
+      : null;
   if (!checkin) return null;
   const noitesFinal = noites > 0 ? noites : Math.max(
     1,
