@@ -8,6 +8,7 @@ export default function DistribuicaoLucros() {
       grupos={["distribuicao_lucros"]}
       contraparteLabel="Sócio"
       contraparteholder="Ex.: Nome do sócio"
+      contraparteSocios
       submitLabel="+ Cadastrar distribuição"
       emptyLabel="Nenhuma distribuição de lucros cadastrada ainda."
     />

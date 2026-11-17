@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Pencil, Trash2, Settings, TriangleAlert, Lock } from "lucide-react";
 import { brl, formatCompetencia, addMesesCompetencia } from "@/lib/format";
@@ -44,13 +44,13 @@ interface FormState {
   observacao: string;
 }
 
-function emptyForm(): FormState {
+function emptyForm(contraparteDefault?: string): FormState {
   const hoje = new Date();
   return {
     propertyId: "",
     chartAccountId: "",
     descricao: "",
-    contraparte: "",
+    contraparte: contraparteDefault || "",
     valor: "",
     dia: "",
     mesInicio: String(hoje.getMonth() + 1),
@@ -68,21 +68,31 @@ interface LancamentoManagerProps {
   contraparteLabel: string;
   contraparteholder: string;
   contraparteFornecedor?: boolean;
+  // Quando true e a empresa tem um único sócio cadastrado, pré-preenche a contraparte com o nome
+  // dele — evita digitar toda vez em empresa de sócio só (Aportes, Distribuição de Lucros).
+  contraparteSocios?: boolean;
   submitLabel: string;
   emptyLabel: string;
 }
 
 /** Página compartilhada de lançamento recorrente (Receitas, Despesas, Aportes): imóvel primeiro, depois conta do plano. */
-export default function LancamentoManager({ titulo, subtitulo, grupos, contraparteLabel, contraparteholder, contraparteFornecedor, submitLabel, emptyLabel }: LancamentoManagerProps) {
+export default function LancamentoManager({ titulo, subtitulo, grupos, contraparteLabel, contraparteholder, contraparteFornecedor, contraparteSocios, submitLabel, emptyLabel }: LancamentoManagerProps) {
   const utils = trpc.useUtils();
   const { data: imoveis } = trpc.properties.list.useQuery();
   const { data: contasTodas } = trpc.chartAccounts.list.useQuery({});
   const { data: entriesTodos, isLoading } = trpc.ledgerEntries.list.useQuery({});
   const { data: fornecedoresTodos } = trpc.fornecedores.list.useQuery(undefined, { enabled: !!contraparteFornecedor });
   const fornecedoresAtivos = useMemo(() => (fornecedoresTodos ?? []).filter((f) => f.ativo === 1), [fornecedoresTodos]);
+  const { data: sociosTodos } = trpc.socios.list.useQuery(undefined, { enabled: !!contraparteSocios });
+  const socioUnico = contraparteSocios && sociosTodos?.length === 1 ? sociosTodos[0].nome : undefined;
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
+
+  // Só preenche se o campo ainda estiver vazio — não sobrescreve o que a pessoa já digitou/editou.
+  useEffect(() => {
+    if (socioUnico) setForm((f) => (f.contraparte ? f : { ...f, contraparte: socioUnico }));
+  }, [socioUnico]);
 
   const contas = useMemo(() => (contasTodas ?? []).filter((c) => grupos.includes(c.grupo as Grupo) && c.ativa === 1), [contasTodas, grupos]);
 
@@ -116,7 +126,7 @@ export default function LancamentoManager({ titulo, subtitulo, grupos, contrapar
     [entriesTodos, grupos],
   );
 
-  const reset = () => { setForm(emptyForm()); setEditingId(null); };
+  const reset = () => { setForm(emptyForm(socioUnico)); setEditingId(null); };
 
   const create = trpc.ledgerEntries.create.useMutation({
     onSuccess: () => { utils.ledgerEntries.list.invalidate(); reset(); toast.success("Lançamento cadastrado."); },
