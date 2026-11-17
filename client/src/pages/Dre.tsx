@@ -6,6 +6,19 @@ import { PageHeader, EmptyState } from "./Clientes";
 import { UnitPeriodFilter } from "@/components/UnitPeriodFilter";
 import { TrendingDown, TrendingUp } from "lucide-react";
 
+/**
+ * Rótulo de uma despesa lançada: o nome que identifica ELA (descrição digitada ou, na falta
+ * dela, o fornecedor), não só a conta do plano — senão toda despesa da mesma conta (ex.: duas
+ * contas de "Manutenção" de fornecedores diferentes) apareceria com o mesmo nome genérico.
+ */
+function despesaLabel(e: { categoria?: string | null; descricao?: string | null; contraparte?: string | null }) {
+  const nome = e.descricao || e.contraparte || e.categoria || "Despesa";
+  const detalhes = [e.categoria, e.descricao && e.contraparte ? e.contraparte : null].filter(
+    (v, i, arr) => v && v !== nome && arr.indexOf(v) === i,
+  );
+  return { nome, detail: detalhes.join(" · ") || undefined };
+}
+
 export default function Dre() {
   const { data: imoveis } = trpc.properties.list.useQuery();
   const [propertyId, setPropertyId] = useState<string>("");
@@ -70,9 +83,10 @@ export default function Dre() {
               {dre.despesasFixas.length > 0 && (
                 <>
                   <SectionLabel>Despesas fixas</SectionLabel>
-                  {dre.despesasFixas.map((e) => (
-                    <Line key={e.id} label={e.categoria || "Despesa"} value={`− ${brl(e.valor)}`} sub small />
-                  ))}
+                  {dre.despesasFixas.map((e) => {
+                    const { nome, detail } = despesaLabel(e);
+                    return <Line key={e.id} label={nome} detail={detail} value={`− ${brl(e.valor)}`} sub small />;
+                  })}
                 </>
               )}
               <Line label="(−) Total de despesas fixas" value={`− ${brl(dre.totalDespesasFixas)}`} sub />
@@ -80,9 +94,10 @@ export default function Dre() {
               {dre.despesasVariaveis.length > 0 && (
                 <>
                   <SectionLabel>Despesas variáveis</SectionLabel>
-                  {dre.despesasVariaveis.map((e) => (
-                    <Line key={e.id} label={e.categoria || "Despesa"} value={`− ${brl(e.valor)}`} sub small />
-                  ))}
+                  {dre.despesasVariaveis.map((e) => {
+                    const { nome, detail } = despesaLabel(e);
+                    return <Line key={e.id} label={nome} detail={detail} value={`− ${brl(e.valor)}`} sub small />;
+                  })}
                 </>
               )}
               <Line label="(−) Total de despesas variáveis" value={`− ${brl(dre.totalDespesasVariaveis)}`} sub />
@@ -122,11 +137,14 @@ export default function Dre() {
   );
 }
 
-function Line({ label, value, bold, sub, small, positive }: { label: string; value: string; bold?: boolean; sub?: boolean; small?: boolean; positive?: boolean }) {
+function Line({ label, value, bold, sub, small, positive, detail }: { label: string; value: string; bold?: boolean; sub?: boolean; small?: boolean; positive?: boolean; detail?: string }) {
   return (
-    <div className={`flex items-center justify-between py-1.5 ${small ? "pl-4" : ""}`}>
-      <span className={`${sub ? "text-muted-foreground" : ""} ${small ? "text-sm" : ""}`}>{label}</span>
-      <span className={`tabular-nums ${bold ? "font-semibold" : ""} ${positive ? "text-primary" : ""} ${small ? "text-sm" : ""}`}>{value}</span>
+    <div className={`flex items-center justify-between gap-3 py-1.5 ${small ? "pl-4" : ""}`}>
+      <span className={`min-w-0 ${sub ? "text-muted-foreground" : ""} ${small ? "text-sm" : ""}`}>
+        <span className="block truncate">{label}</span>
+        {detail && <span className="block truncate text-[11px] text-muted-foreground">{detail}</span>}
+      </span>
+      <span className={`tabular-nums shrink-0 ${bold ? "font-semibold" : ""} ${positive ? "text-primary" : ""} ${small ? "text-sm" : ""}`}>{value}</span>
     </div>
   );
 }
