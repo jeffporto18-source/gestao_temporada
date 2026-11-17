@@ -8,6 +8,7 @@ export default function Aportes() {
       grupos={["aporte_capital"]}
       contraparteLabel="Origem do aporte"
       contraparteholder="Ex.: Proprietário"
+      contraparteSocios
       submitLabel="+ Cadastrar aporte"
       emptyLabel="Nenhum aporte cadastrado ainda."
     />
