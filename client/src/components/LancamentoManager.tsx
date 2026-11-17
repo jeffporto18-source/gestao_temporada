@@ -11,6 +11,17 @@ import {
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Pencil, Trash2, Settings, TriangleAlert, Lock } from "lucide-react";
@@ -396,9 +407,37 @@ export default function LancamentoManager({ titulo, subtitulo, grupos, contrapar
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => openEdit(e)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => del.mutate({ id: e.id })}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          title={e.qtdMeses > 1 ? `Excluir — remove todos os ${e.qtdMeses} meses lançados por este cadastro` : "Excluir"}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Excluir lançamento</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            {e.qtdMeses > 1
+                              ? `Isso exclui o cadastro e de uma vez todos os ${e.qtdMeses} meses que ele já lançou (${formatCompetencia(e.competenciaInicio)} a ${formatCompetencia(addMesesCompetencia(e.competenciaInicio, e.qtdMeses - 1))}). Meses já baixados (com comprovante) travam a exclusão — reabra a baixa deles antes, no Relatório, se precisar excluir mesmo assim.`
+                              : "Isso exclui o lançamento deste mês. Se já estiver baixado (com comprovante), reabra a baixa antes, no Relatório."}
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => del.mutate({ id: e.id })}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Excluir
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 )}
               </div>
