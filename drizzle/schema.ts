@@ -158,7 +158,7 @@ export type InsertProperty = typeof properties.$inferInsert;
 export const chartAccounts = mysqlTable("chart_accounts", {
   id: int("id").autoincrement().primaryKey(),
   ownerId: int("ownerId").notNull(),
-  grupo: mysqlEnum("grupo", ["conta_principal", "despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao"]).notNull(),
+  grupo: mysqlEnum("grupo", ["conta_principal", "despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao", "distribuicao_lucros"]).notNull(),
   nome: varchar("nome", { length: 100 }).notNull(),
   parentId: int("parentId"), // null = conta principal (nível 0); caso contrário, aponta para o pai imediato (máx. nível 3)
   ativa: int("ativa").notNull().default(1),
@@ -190,7 +190,7 @@ export const ledgerEntries = mysqlTable("ledger_entries", {
   // Nulo = lançamento da empresa, sem imóvel específico (ex.: despesas administrativas do escritório).
   propertyId: int("propertyId"),
   chartAccountId: int("chartAccountId"), // referencia chart_accounts.id (nulo = desconto sem classificação, só com descrição)
-  grupo: mysqlEnum("grupo", ["despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao"]).notNull(), // denormalizado da conta, para consulta rápida
+  grupo: mysqlEnum("grupo", ["despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao", "distribuicao_lucros"]).notNull(), // denormalizado da conta, para consulta rápida
   categoria: varchar("categoria", { length: 300 }), // caminho da conta (denormalizado para consulta rápida)
   codigoContabil: varchar("codigoContabil", { length: 50 }), // denormalizado da conta, idem — uso interno da contabilidade
   descricao: varchar("descricao", { length: 300 }),
@@ -229,7 +229,7 @@ export const ledgerCharges = mysqlTable("ledger_charges", {
   ledgerEntryId: int("ledgerEntryId"),
   propertyCostId: int("propertyCostId"),
   propertyId: int("propertyId"),
-  grupo: mysqlEnum("grupo", ["despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao"]).notNull(),
+  grupo: mysqlEnum("grupo", ["despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao", "distribuicao_lucros"]).notNull(),
   categoria: varchar("categoria", { length: 300 }),
   codigoContabil: varchar("codigoContabil", { length: 50 }), // uso interno da contabilidade
   descricao: varchar("descricao", { length: 300 }),

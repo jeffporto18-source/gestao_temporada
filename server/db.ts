@@ -194,7 +194,7 @@ export async function deleteProperty(ownerId: number, id: number) {
 export async function listLedgerEntries(
   ownerId: number,
   propertyId?: number,
-  grupo?: "despesa_fixa" | "despesa_variavel" | "receita" | "aporte_capital" | "repasse_caucao",
+  grupo?: "despesa_fixa" | "despesa_variavel" | "receita" | "aporte_capital" | "repasse_caucao" | "distribuicao_lucros",
 ) {
   const db = await requireDb();
   const conds = [eq(ledgerEntries.ownerId, ownerId)];
@@ -216,7 +216,7 @@ export async function listLedgerEntriesNaCompetencia(
   ownerId: number,
   propertyId: number,
   competencia: string,
-  grupo?: "despesa_fixa" | "despesa_variavel" | "receita" | "aporte_capital" | "repasse_caucao",
+  grupo?: "despesa_fixa" | "despesa_variavel" | "receita" | "aporte_capital" | "repasse_caucao" | "distribuicao_lucros",
 ) {
   const todos = await listLedgerEntries(ownerId, propertyId, grupo);
   return todos.filter((e) => competenciaNaSerie(e.competenciaInicio, e.qtdMeses, competencia));
@@ -252,7 +252,7 @@ export async function listLedgerCharges(
     ledgerEntryId?: number;
     propertyCostId?: number;
     propertyId?: number;
-    grupo?: "despesa_fixa" | "despesa_variavel" | "receita" | "aporte_capital" | "repasse_caucao";
+    grupo?: "despesa_fixa" | "despesa_variavel" | "receita" | "aporte_capital" | "repasse_caucao" | "distribuicao_lucros";
     status?: "aberto" | "pago" | "cancelado";
   },
 ) {
@@ -728,7 +728,7 @@ export async function updateTenant(
 }
 
 // ------------------------------------------------------- plano de contas (chart accounts)
-type ChartAccountGrupo = "despesa_fixa" | "despesa_variavel" | "receita" | "aporte_capital" | "repasse_caucao";
+type ChartAccountGrupo = "despesa_fixa" | "despesa_variavel" | "receita" | "aporte_capital" | "repasse_caucao" | "distribuicao_lucros";
 
 export async function listChartAccounts(ownerId: number, grupo?: ChartAccountGrupo) {
   const db = await requireDb();

@@ -20,6 +20,7 @@ import Receitas from "./pages/Receitas";
 import Despesas from "./pages/Despesas";
 import Relatorio from "./pages/Relatorio";
 import Aportes from "./pages/Aportes";
+import DistribuicaoLucros from "./pages/DistribuicaoLucros";
 import RepasseCaucao from "./pages/RepasseCaucao";
 import Fornecedores from "./pages/Fornecedores";
 import Socios from "./pages/Socios";
@@ -166,6 +167,11 @@ function App() {
             <Route path="/aportes">
               <RequireAuth>
                 <DashboardLayout><Aportes /></DashboardLayout>
+              </RequireAuth>
+            </Route>
+            <Route path="/distribuicao-lucros">
+              <RequireAuth>
+                <DashboardLayout><DistribuicaoLucros /></DashboardLayout>
               </RequireAuth>
             </Route>
             <Route path="/repasse-caucao">

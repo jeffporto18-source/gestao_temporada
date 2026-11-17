@@ -15,7 +15,7 @@ import { Plus, Trash2, Pencil, Check, X, ChevronRight, ChevronDown } from "lucid
 import { PageHeader } from "./Clientes";
 import { useAuth } from "@/_core/hooks/useAuth";
 
-type Grupo = "conta_principal" | "despesa_fixa" | "despesa_variavel" | "receita" | "aporte_capital" | "repasse_caucao";
+type Grupo = "conta_principal" | "despesa_fixa" | "despesa_variavel" | "receita" | "aporte_capital" | "repasse_caucao" | "distribuicao_lucros";
 type ChartAccount = RouterOutputs["chartAccounts"]["list"][number];
 
 const GRUPO_LABELS: Record<Grupo, string> = {
@@ -25,6 +25,7 @@ const GRUPO_LABELS: Record<Grupo, string> = {
   receita: "Receita",
   aporte_capital: "Aporte de Capital",
   repasse_caucao: "Repasse de Caução (não entra na DRE)",
+  distribuicao_lucros: "Distribuição de Lucros (não entra na DRE)",
 };
 
 const MAX_DEPTH = 3; // 4 níveis: 0=conta principal, 1=conta, 2=subconta (modalidade), 3=sub-subconta (despesa)

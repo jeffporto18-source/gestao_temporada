@@ -21,7 +21,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, Pencil, UserRound, Users } from "lucide-react";
+import { Plus, Trash2, Pencil, UserRound, Users, PiggyBank, HandCoins } from "lucide-react";
+import { Link } from "wouter";
 import { PageHeader, EmptyState, SkeletonList } from "./Clientes";
 import { formatCpfCnpj } from "@/lib/format";
 
@@ -136,6 +137,35 @@ export default function Socios() {
           </div>
         }
       />
+
+      <div className="grid sm:grid-cols-2 gap-4 mb-6">
+        <Link href="/aportes">
+          <Card className="p-5 flex items-center gap-4 cursor-pointer hover:border-primary/40 transition-colors">
+            <div className="h-11 w-11 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <PiggyBank className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-medium">Aporte de Capital</p>
+              <p className="text-xs text-muted-foreground">
+                Dinheiro que o sócio injeta na empresa — não entra como receita. Lança por imóvel e dá baixa no Relatório, para conciliar com o extrato.
+              </p>
+            </div>
+          </Card>
+        </Link>
+        <Link href="/distribuicao-lucros">
+          <Card className="p-5 flex items-center gap-4 cursor-pointer hover:border-primary/40 transition-colors">
+            <div className="h-11 w-11 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <HandCoins className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-medium">Distribuição de Lucros</p>
+              <p className="text-xs text-muted-foreground">
+                Lucro devolvido aos sócios — não entra como despesa. Lança por imóvel e dá baixa no Relatório, para conciliar com o extrato.
+              </p>
+            </div>
+          </Card>
+        </Link>
+      </div>
 
       {isLoading ? (
         <SkeletonList />

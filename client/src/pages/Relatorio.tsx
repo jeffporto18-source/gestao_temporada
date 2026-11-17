@@ -29,7 +29,7 @@ import * as XLSX from "xlsx";
 type Charge = RouterOutputs["ledgerCharges"]["list"][number];
 type Parcela = RouterOutputs["longTermContracts"]["charges"][number];
 type Reserva = RouterOutputs["reservations"]["list"][number];
-type Tipo = "" | "despesa" | "receita" | "aporte" | "repasse";
+type Tipo = "" | "despesa" | "receita" | "aporte" | "repasse" | "distribuicao";
 type Situacao = "" | "aberto" | "pago" | "cancelado";
 
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -46,18 +46,20 @@ function anosDisponiveis(): number[] {
 }
 
 const GRUPOS_DO_TIPO: Record<Tipo, Charge["grupo"][]> = {
-  "": ["despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao"],
+  "": ["despesa_fixa", "despesa_variavel", "receita", "aporte_capital", "repasse_caucao", "distribuicao_lucros"],
   despesa: ["despesa_fixa", "despesa_variavel"],
   receita: ["receita"],
   aporte: ["aporte_capital"],
   repasse: ["repasse_caucao"],
+  distribuicao: ["distribuicao_lucros"],
 };
 
-/** Rótulo da ação de baixa: aluga/vende (receita), aporta capital, repassa caução, ou paga uma despesa. */
+/** Rótulo da ação de baixa: aluga/vende (receita), aporta capital, repassa caução, distribui lucro, ou paga uma despesa. */
 function rotuloBaixa(grupo: Charge["grupo"]) {
   if (grupo === "receita") return "Marcar como recebido";
   if (grupo === "aporte_capital") return "Confirmar aporte";
   if (grupo === "repasse_caucao") return "Confirmar repasse";
+  if (grupo === "distribuicao_lucros") return "Confirmar distribuição";
   return "Dar baixa";
 }
 
@@ -165,10 +167,11 @@ export default function Relatorio() {
         if (c.grupo === "receita") acc.receita += valor;
         else if (c.grupo === "aporte_capital") acc.aporte += valor;
         else if (c.grupo === "repasse_caucao") acc.repasse += valor;
+        else if (c.grupo === "distribuicao_lucros") acc.distribuicao += valor;
         else acc.despesa += valor;
         return acc;
       },
-      { receita: 0, despesa: 0, aporte: 0, repasse: 0 },
+      { receita: 0, despesa: 0, aporte: 0, repasse: 0, distribuicao: 0 },
     );
     for (const p of parcelas) {
       acc.receita += p.status === "recebido" ? Number(p.valorRecebido ?? p.valor) : Number(p.valor);
@@ -287,7 +290,7 @@ export default function Relatorio() {
         <h2 className="text-base font-serif font-bold">Relatório · {periodo}</h2>
       </div>
 
-      <div className="mb-4 grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="mb-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <Card className="px-4 py-2.5">
           <p className="text-[11px] text-muted-foreground">Receitas · {periodo}</p>
           <p className="text-lg font-serif font-semibold text-primary leading-tight">{brl(totais.receita)}</p>
@@ -303,6 +306,10 @@ export default function Relatorio() {
         <Card className="px-4 py-2.5">
           <p className="text-[11px] text-muted-foreground">Aportes de sócios</p>
           <p className="text-lg font-serif font-semibold leading-tight">{brl(totais.aporte)}</p>
+        </Card>
+        <Card className="px-4 py-2.5">
+          <p className="text-[11px] text-muted-foreground">Distribuição de lucros</p>
+          <p className="text-lg font-serif font-semibold leading-tight">{brl(totais.distribuicao)}</p>
         </Card>
         <Card className="px-4 py-2.5">
           <p className="text-[11px] text-muted-foreground">Repasse de caução</p>
@@ -363,6 +370,7 @@ export default function Relatorio() {
                 <SelectItem value="receita">Só receitas</SelectItem>
                 <SelectItem value="despesa">Só despesas</SelectItem>
                 <SelectItem value="aporte">Só aportes</SelectItem>
+                <SelectItem value="distribuicao">Só distribuições de lucros</SelectItem>
                 <SelectItem value="repasse">Só repasses de caução</SelectItem>
               </SelectContent>
             </Select>
@@ -397,7 +405,7 @@ export default function Relatorio() {
       {isLoading || isLoadingParcelas || isLoadingReservas ? (
         <SkeletonList />
       ) : !grupos.length ? (
-        <EmptyState title="Nada por aqui" subtitle="Cadastre contas em Contas a Pagar, Contas a Receber, Aportes ou Repasse de Caução para elas aparecerem aqui mês a mês." />
+        <EmptyState title="Nada por aqui" subtitle="Cadastre contas em Contas a Pagar, Contas a Receber, Aportes, Distribuição de Lucros ou Repasse de Caução para elas aparecerem aqui mês a mês." />
       ) : (
         <div className="space-y-3">
           {grupos.map((g) => (

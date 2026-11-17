@@ -144,10 +144,15 @@ export async function conciliarExtratoContasAReceber(ownerId: number, ano: numbe
 
   const competencia = `${ano}-${String(mes).padStart(2, "0")}`;
 
-  const [ledgerChargesReceita, ledgerChargesDespesa, contratosCharges, contratos, properties, reservasPorCheckin, reservasPorRecebimento] =
+  const [ledgerChargesReceita, ledgerChargesDespesa, ledgerChargesAporte, ledgerChargesDistribuicao, contratosCharges, contratos, properties, reservasPorCheckin, reservasPorRecebimento] =
     await Promise.all([
       db.listLedgerCharges(ownerId, { grupo: "receita" }),
       db.listLedgerCharges(ownerId, { grupo: "despesa_fixa" }),
+      // Aporte de capital e distribuição de lucros não são receita nem despesa (não entram na DRE),
+      // mas são dinheiro de verdade entrando/saindo da conta — por isso precisam bater com o
+      // extrato igual a qualquer outro recebível/pagável.
+      db.listLedgerCharges(ownerId, { grupo: "aporte_capital" }),
+      db.listLedgerCharges(ownerId, { grupo: "distribuicao_lucros" }),
       db.listContractRentChargesByCompetencia(ownerId, competencia),
       db.listLongTermContracts(ownerId),
       db.listProperties(ownerId),
@@ -167,6 +172,8 @@ export async function conciliarExtratoContasAReceber(ownerId: number, ano: numbe
   const despesasDoMes = [...ledgerChargesDespesa, ...ledgerChargesDespesaVariavel].filter(
     (c) => c.competencia === competencia && c.status !== "cancelado",
   );
+  const aportesDoMes = ledgerChargesAporte.filter((c) => c.competencia === competencia && c.status !== "cancelado");
+  const distribuicoesDoMes = ledgerChargesDistribuicao.filter((c) => c.competencia === competencia && c.status !== "cancelado");
 
   const recebiveis: ItemConciliacao[] = [
     ...receitasDoMes.map((c) => ({
@@ -203,17 +210,37 @@ export async function conciliarExtratoContasAReceber(ownerId: number, ano: numbe
         encontradoNoExtrato: false,
       };
     }),
+    ...aportesDoMes.map((c) => ({
+      tipo: "ledger" as const,
+      id: c.id,
+      descricao: c.descricao || (c.contraparte ? `${c.categoria || "Aporte de capital"} — ${c.contraparte}` : c.categoria || "Aporte de capital"),
+      valor: round2(c.status === "pago" ? num(c.valorPago ?? c.valor) : num(c.valor)),
+      data: c.dataVencimento,
+      status: c.status,
+      encontradoNoExtrato: false,
+    })),
   ];
 
-  const pagaveis: ItemConciliacao[] = despesasDoMes.map((c) => ({
-    tipo: "despesa" as const,
-    id: c.id,
-    descricao: c.descricao || (c.contraparte ? `${c.categoria || "Despesa"} — ${c.contraparte}` : c.categoria || "Despesa"),
-    valor: round2(c.status === "pago" ? num(c.valorPago ?? c.valor) : num(c.valor)),
-    data: c.dataVencimento,
-    status: c.status,
-    encontradoNoExtrato: false,
-  }));
+  const pagaveis: ItemConciliacao[] = [
+    ...despesasDoMes.map((c) => ({
+      tipo: "despesa" as const,
+      id: c.id,
+      descricao: c.descricao || (c.contraparte ? `${c.categoria || "Despesa"} — ${c.contraparte}` : c.categoria || "Despesa"),
+      valor: round2(c.status === "pago" ? num(c.valorPago ?? c.valor) : num(c.valor)),
+      data: c.dataVencimento,
+      status: c.status,
+      encontradoNoExtrato: false,
+    })),
+    ...distribuicoesDoMes.map((c) => ({
+      tipo: "despesa" as const,
+      id: c.id,
+      descricao: c.descricao || (c.contraparte ? `${c.categoria || "Distribuição de lucros"} — ${c.contraparte}` : c.categoria || "Distribuição de lucros"),
+      valor: round2(c.status === "pago" ? num(c.valorPago ?? c.valor) : num(c.valor)),
+      data: c.dataVencimento,
+      status: c.status,
+      encontradoNoExtrato: false,
+    })),
+  ];
 
   const entradasSemLancamento = conciliarPorValor(recebiveis, entradas);
   const saidasSemLancamento = conciliarPorValor(pagaveis, saidas);
