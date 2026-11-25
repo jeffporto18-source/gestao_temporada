@@ -2317,7 +2317,9 @@ export const appRouter = router({
             tipoDocumento: "CPF/CNPJ",
             tipoLocacao: "longa",
             imovel: prop?.apelido || "-",
-            valor: round2(num(p.valor)),
+            // Já recebida: usa o valor efetivamente recebido (soma multa/juros, subtrai desconto).
+            // Ainda pendente: usa o aluguel nominal, já que não há multa/juros a aplicar ainda.
+            valor: round2(p.status === "recebido" ? num(p.valorRecebido ?? p.valor) : num(p.valor)),
           });
         }
 
@@ -2381,7 +2383,8 @@ export const appRouter = router({
           const prop = propMap.get(p.propertyId);
           const documento = contrato?.cpfCnpjInquilino || "-";
           const chave = `longa|${documento}|${contrato?.nomeInquilino}|${p.propertyId}`;
-          const valor = round2(num(p.valor));
+          // Mesma regra da EFD Contribuições: recebida usa o valor efetivo (com multa/juros), pendente usa o nominal.
+          const valor = round2(p.status === "recebido" ? num(p.valorRecebido ?? p.valor) : num(p.valor));
           const existente = porChave.get(chave);
           if (existente) existente.valor = round2(existente.valor + valor);
           else
