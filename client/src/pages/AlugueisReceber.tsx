@@ -48,21 +48,35 @@ export default function AlugueisReceber() {
     onError: (e) => toast.error(e.message),
   });
 
-  // Agrupa por competência (mês), do primeiro contrato ao último, em ordem cronológica.
+  // Regime de caixa: pendente agrupa pela competência (o mês do aluguel, que é quando vence),
+  // mas já recebida agrupa pelo mês em que o dinheiro realmente entrou (dataRecebimento) — um
+  // aluguel pago em atraso precisa contar no mês do recebimento, não no mês em que venceria.
   const grupos = useMemo(() => {
-    const mapa = new Map<string, NonNullable<typeof charges>>();
+    const pendentesPorMes = new Map<string, NonNullable<typeof charges>>();
+    const recebidosPorMes = new Map<string, NonNullable<typeof charges>>();
     for (const ch of charges ?? []) {
-      if (!mapa.has(ch.competencia)) mapa.set(ch.competencia, []);
-      mapa.get(ch.competencia)!.push(ch);
+      if (ch.status === "recebido") {
+        const mes = (ch.dataRecebimento ?? ch.competencia).slice(0, 7);
+        if (!recebidosPorMes.has(mes)) recebidosPorMes.set(mes, []);
+        recebidosPorMes.get(mes)!.push(ch);
+      } else {
+        if (!pendentesPorMes.has(ch.competencia)) pendentesPorMes.set(ch.competencia, []);
+        pendentesPorMes.get(ch.competencia)!.push(ch);
+      }
     }
-    return Array.from(mapa.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([competencia, itens]) => ({
-        competencia,
-        pendentes: itens.filter((c) => c.status !== "recebido").sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento)),
-        recebidos: itens.filter((c) => c.status === "recebido").sort((a, b) => (b.dataRecebimento ?? "").localeCompare(a.dataRecebimento ?? "")),
-        total: itens.reduce((s, c) => s + (c.status === "recebido" ? Number(c.valorRecebido ?? c.valor) : Number(c.valor)), 0),
-      }));
+    const meses = new Set([...Array.from(pendentesPorMes.keys()), ...Array.from(recebidosPorMes.keys())]);
+    return Array.from(meses)
+      .sort()
+      .map((mes) => {
+        const pendentes = (pendentesPorMes.get(mes) ?? []).sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento));
+        const recebidos = (recebidosPorMes.get(mes) ?? []).sort((a, b) => (b.dataRecebimento ?? "").localeCompare(a.dataRecebimento ?? ""));
+        return {
+          competencia: mes,
+          pendentes,
+          recebidos,
+          total: pendentes.reduce((s, c) => s + Number(c.valor), 0) + recebidos.reduce((s, c) => s + Number(c.valorRecebido ?? c.valor), 0),
+        };
+      });
   }, [charges]);
 
   const totalGeral = useMemo(
