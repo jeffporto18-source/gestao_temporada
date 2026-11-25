@@ -2280,7 +2280,8 @@ export const appRouter = router({
         const propMap = new Map(props.map((p) => [p.id, p]));
 
         const reservas = await db.listReservationsRecebidasNaCompetencia(ctx.ownerId, input.competencia);
-        const parcelas = await db.listContractRentChargesByCompetencia(ctx.ownerId, input.competencia);
+        // Regime de caixa também na longa duração: parcela ainda pendente não é rendimento recebido.
+        const parcelas = await db.listContractRentChargesRecebidasNaCompetencia(ctx.ownerId, input.competencia);
 
         type Item = {
           nome: string;
@@ -2317,9 +2318,9 @@ export const appRouter = router({
             tipoDocumento: "CPF/CNPJ",
             tipoLocacao: "longa",
             imovel: prop?.apelido || "-",
-            // Já recebida: usa o valor efetivamente recebido (soma multa/juros, subtrai desconto).
-            // Ainda pendente: usa o aluguel nominal, já que não há multa/juros a aplicar ainda.
-            valor: round2(p.status === "recebido" ? num(p.valorRecebido ?? p.valor) : num(p.valor)),
+            // Só chega aqui já recebida (ver listContractRentChargesRecebidasNaCompetencia) — usa o
+            // valor efetivamente recebido, que já soma multa/juros e subtrai desconto.
+            valor: round2(num(p.valorRecebido ?? p.valor)),
           });
         }
 
@@ -2334,8 +2335,8 @@ export const appRouter = router({
 
     // DIMOB: relatório anual de quem alugou cada unidade (curta e longa duração) durante
     // o ano inteiro, com nome, CPF/passaporte e valor total recebido no ano por locação.
-    // Regime de caixa NA PARTE DE CURTA TEMPORADA, igual à EFD Contribuições acima. A parte de
-    // longa duração continua por competência — ver o comentário na EFD Contribuições.
+    // Regime de caixa nas duas partes: parcela de longa duração ainda pendente não é rendimento
+    // recebido, então não entra — mesma regra da EFD Contribuições.
     dimob: financeiroProcedure
       .input(z.object({ ano: z.string().regex(/^\d{4}$/) }))
       .query(async ({ ctx, input }) => {
@@ -2344,7 +2345,7 @@ export const appRouter = router({
         const propMap = new Map(props.map((p) => [p.id, p]));
 
         const reservas = await db.listReservationsRecebidasNoAno(ctx.ownerId, input.ano);
-        const parcelas = await db.listContractRentChargesByYear(ctx.ownerId, input.ano);
+        const parcelas = await db.listContractRentChargesRecebidasNoAno(ctx.ownerId, input.ano);
 
         type Item = {
           nome: string;
@@ -2383,8 +2384,8 @@ export const appRouter = router({
           const prop = propMap.get(p.propertyId);
           const documento = contrato?.cpfCnpjInquilino || "-";
           const chave = `longa|${documento}|${contrato?.nomeInquilino}|${p.propertyId}`;
-          // Mesma regra da EFD Contribuições: recebida usa o valor efetivo (com multa/juros), pendente usa o nominal.
-          const valor = round2(p.status === "recebido" ? num(p.valorRecebido ?? p.valor) : num(p.valor));
+          // Só chega aqui já recebida — usa o valor efetivamente recebido (com multa/juros, menos desconto).
+          const valor = round2(num(p.valorRecebido ?? p.valor));
           const existente = porChave.get(chave);
           if (existente) existente.valor = round2(existente.valor + valor);
           else

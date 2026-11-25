@@ -1097,26 +1097,27 @@ export async function listContractRentChargesByCompetencia(ownerId: number, comp
     .where(and(eq(contractRentCharges.ownerId, ownerId), eq(contractRentCharges.competencia, competencia)));
 }
 
-/** Parcelas de aluguel de longa duração de TODOS os imóveis num ano, usado no relatório DIMOB. */
-export async function listContractRentChargesByYear(ownerId: number, ano: string) {
-  const db = await requireDb();
-  return db
-    .select()
-    .from(contractRentCharges)
-    .where(and(eq(contractRentCharges.ownerId, ownerId), like(contractRentCharges.competencia, `${ano}-%`)));
-}
-
 /**
- * Parcelas efetivamente RECEBIDAS dentro do ano, pela data de recebimento.
- *
- * Diferente de `listContractRentChargesByYear`, que filtra por competência: o informe de IR segue
- * regime de caixa, então o aluguel de dezembro pago em janeiro pertence ao ano seguinte.
+ * Parcelas efetivamente RECEBIDAS dentro do ano, pela data de recebimento — regime de caixa,
+ * usado no DIMOB e no informe de IR. Diferente de filtrar por competência: o aluguel de dezembro
+ * pago em janeiro pertence ao ano seguinte, e uma parcela ainda pendente não entra (dinheiro que
+ * não caiu na conta não é rendimento declarável).
  */
 export async function listContractRentChargesRecebidasNoAno(ownerId: number, ano: string, contractId?: number) {
   const db = await requireDb();
   const conds = [eq(contractRentCharges.ownerId, ownerId), eq(contractRentCharges.status, "recebido"), like(contractRentCharges.dataRecebimento, `${ano}-%`)];
   if (contractId) conds.push(eq(contractRentCharges.contractId, contractId));
   return db.select().from(contractRentCharges).where(and(...conds)).orderBy(contractRentCharges.dataRecebimento);
+}
+
+/** Mesma ideia acima, só que por mês — regime de caixa, usado na EFD Contribuições. */
+export async function listContractRentChargesRecebidasNaCompetencia(ownerId: number, competencia: string) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(contractRentCharges)
+    .where(and(eq(contractRentCharges.ownerId, ownerId), eq(contractRentCharges.status, "recebido"), like(contractRentCharges.dataRecebimento, `${competencia}-%`)))
+    .orderBy(contractRentCharges.dataRecebimento);
 }
 
 export async function getContractRentCharge(ownerId: number, id: number) {
