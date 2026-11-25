@@ -21,7 +21,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, FileText, CheckCircle2, Circle, User, Upload, ExternalLink, Loader2, Pencil } from "lucide-react";
+import { Plus, Trash2, FileText, CheckCircle2, Circle, User, Upload, ExternalLink, Loader2, Pencil, TriangleAlert } from "lucide-react";
 import { brl, formatDate } from "@/lib/format";
 import { PageHeader, EmptyState, SkeletonList } from "./Clientes";
 
@@ -206,6 +206,14 @@ export default function Contratos() {
   const { data: todosContratos } = trpc.longTermContracts.list.useQuery({});
   const imoveisComContrato = useMemo(() => new Set((todosContratos ?? []).map((c) => c.propertyId)), [todosContratos]);
   const imoveisSemContrato = useMemo(() => longTermProps.filter((p) => !imoveisComContrato.has(p.id)), [longTermProps, imoveisComContrato]);
+
+  // Explica por que "Novo contrato" está desabilitado — antes só aparecia dentro do diálogo, que
+  // não abre justamente quando o botão está desabilitado, então a pessoa nunca via o motivo.
+  const motivoBotaoDesabilitado = !longTermProps.length
+    ? 'Nenhum imóvel está marcado como "Longa duração" — ajuste o tipo de locação em Imóveis.'
+    : !imoveisSemContrato.length
+      ? "Todos os imóveis de longa duração já têm contrato cadastrado."
+      : null;
 
   // Quando a tela já está filtrada por um imóvel específico (sem contrato ainda), "Novo contrato"
   // não precisa perguntar de novo qual imóvel é — a pessoa já escolheu isso uma vez, no filtro do
@@ -495,6 +503,7 @@ export default function Contratos() {
                 size="sm"
                 className="active:scale-[0.97] transition-transform"
                 disabled={!imoveisSemContrato.length}
+                title={motivoBotaoDesabilitado ?? undefined}
                 onClick={() => {
                   // Herda o imóvel do filtro do topo, já com administração/imobiliária/comissão
                   // dele — a mesma lógica que o Select do imóvel já aplica ao trocar de opção.
@@ -991,6 +1000,12 @@ export default function Contratos() {
           </div>
         }
       />
+
+      {motivoBotaoDesabilitado && (
+        <p className="mb-4 flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-400">
+          <TriangleAlert className="h-4 w-4 shrink-0" /> {motivoBotaoDesabilitado}
+        </p>
+      )}
 
       <div className="mb-6 flex items-center gap-3">
         <Select value={propertyId || "all"} onValueChange={(v) => setPropertyId(v === "all" ? "" : v)}>
