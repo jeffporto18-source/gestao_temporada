@@ -993,8 +993,9 @@ export function encerrarSerieAntes(competenciaInicio: string, novaCompetencia: s
   return Math.max(0, y1 * 12 + (m1 - 1) - (y0 * 12 + (m0 - 1)));
 }
 
-/** Um contrato responde pela competência quando ela cai dentro da vigência (ou da renovação por prazo indeterminado). */
+/** Um contrato responde pela competência quando ela cai dentro da vigência (ou da renovação por prazo indeterminado), e não depois de um encerramento antecipado. */
 export function contratoCobreCompetencia(contrato: LongTermContract, competencia: string): boolean {
+  if (contrato.encerradoEm && competencia > contrato.encerradoEm.slice(0, 7)) return false;
   const inicio = contrato.dataInicio.slice(0, 7);
   const fim = contrato.dataFim.slice(0, 7);
   if (competencia >= inicio && competencia < fim) return true;

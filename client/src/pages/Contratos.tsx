@@ -21,7 +21,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, FileText, CheckCircle2, Circle, User, Upload, ExternalLink, Loader2, Pencil, TriangleAlert } from "lucide-react";
+import { Plus, Trash2, FileText, CheckCircle2, Circle, User, Upload, ExternalLink, Loader2, Pencil, TriangleAlert, Ban } from "lucide-react";
 import { brl, formatDate } from "@/lib/format";
 import { PageHeader, EmptyState, SkeletonList } from "./Clientes";
 
@@ -185,6 +185,9 @@ export default function Contratos() {
   }>({});
   // Toggle de "sem carência": quando marcado, esvazia e esconde os campos de data de carência.
   const [semCarencia, setSemCarencia] = useState(false);
+  // Id do contrato sendo encerrado (abre o diálogo de encerramento) e a data escolhida nele.
+  const [encerrandoId, setEncerrandoId] = useState<number | null>(null);
+  const [dataEncerramento, setDataEncerramento] = useState("");
   const [uploadingLocacao, setUploadingLocacao] = useState(false);
   const [uploadingGarantia, setUploadingGarantia] = useState(false);
   const [uploadingApolice, setUploadingApolice] = useState(false);
@@ -204,7 +207,8 @@ export default function Contratos() {
 
   // Todos os contratos (sem filtro de imóvel), usado para saber quais imóveis já têm contrato.
   const { data: todosContratos } = trpc.longTermContracts.list.useQuery({});
-  const imoveisComContrato = useMemo(() => new Set((todosContratos ?? []).map((c) => c.propertyId)), [todosContratos]);
+  // Contrato encerrado antecipadamente não ocupa mais o imóvel — libera pra um contrato novo.
+  const imoveisComContrato = useMemo(() => new Set((todosContratos ?? []).filter((c) => !c.encerradoEm).map((c) => c.propertyId)), [todosContratos]);
   const imoveisSemContrato = useMemo(() => longTermProps.filter((p) => !imoveisComContrato.has(p.id)), [longTermProps, imoveisComContrato]);
 
   // Explica por que "Novo contrato" está desabilitado — antes só aparecia dentro do diálogo, que
@@ -264,6 +268,16 @@ export default function Contratos() {
 
   const del = trpc.longTermContracts.delete.useMutation({
     onSuccess: () => { utils.longTermContracts.list.invalidate(); setSelectedContractId(null); toast.success("Contrato removido."); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const encerrar = trpc.longTermContracts.encerrar.useMutation({
+    onSuccess: () => {
+      utils.longTermContracts.list.invalidate();
+      utils.longTermContracts.charges.invalidate();
+      setEncerrandoId(null);
+      toast.success("Contrato encerrado.");
+    },
     onError: (e) => toast.error(e.message),
   });
 
@@ -1039,7 +1053,10 @@ export default function Contratos() {
                     <FileText className="h-4 w-4 text-primary" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{nomeImovel(c.propertyId)}</p>
+                    <p className="text-sm font-medium truncate flex items-center gap-1.5">
+                      {nomeImovel(c.propertyId)}
+                      {c.encerradoEm && <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground shrink-0">Encerrado</Badge>}
+                    </p>
                     <p className="text-xs text-muted-foreground truncate">
                       {c.nomeInquilino || "Inquilino não informado"} · {formatDate(c.dataInicio)}–{formatDate(c.dataFim)} · {c.indiceCorrecao}
                     </p>
@@ -1065,7 +1082,14 @@ export default function Contratos() {
                 <div className="px-4 py-3 border-b border-border">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium">{selectedContract.nomeInquilino || "Inquilino"}</p>
+                      <p className="text-sm font-medium flex items-center gap-1.5 flex-wrap">
+                        {selectedContract.nomeInquilino || "Inquilino"}
+                        {selectedContract.encerradoEm && (
+                          <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground">
+                            Encerrado em {formatDate(selectedContract.encerradoEm)}
+                          </Badge>
+                        )}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         Vencimento todo dia {selectedContract.diaVencimentoAluguel} · {nomeImovel(selectedContract.propertyId)}
                         {selectedContract.tipoGarantia ? ` · Garantia: ${selectedContract.tipoGarantia}` : ""}
@@ -1075,14 +1099,27 @@ export default function Contratos() {
                         {Number(selectedContract.comissaoPct) > 0 ? ` · Comissão ${Number(selectedContract.comissaoPct)}%` : ""}
                       </p>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-primary shrink-0"
-                      onClick={() => openEdit(selectedContract)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {!selectedContract.encerradoEm && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          title="Encerrar contrato antecipadamente"
+                          onClick={() => { setDataEncerramento(new Date().toISOString().slice(0, 10)); setEncerrandoId(selectedContract.id); }}
+                        >
+                          <Ban className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-primary"
+                        onClick={() => openEdit(selectedContract)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
                   <div className="mt-3 space-y-2">
                     <DocumentoUploadRow
@@ -1217,6 +1254,35 @@ export default function Contratos() {
           </div>
         </div>
       )}
+
+      <Dialog open={encerrandoId !== null} onOpenChange={(o) => !o && setEncerrandoId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-serif">Encerrar contrato</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Cancela as parcelas ainda pendentes com competência posterior ao mês escolhido — as já
+              recebidas continuam no histórico. O imóvel fica livre para um contrato novo. Não tem
+              como desfazer automaticamente depois.
+            </p>
+            <div className="grid gap-1.5">
+              <Label>Data de encerramento</Label>
+              <DateInput value={dataEncerramento} onChange={setDataEncerramento} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="bg-background" onClick={() => setEncerrandoId(null)}>Cancelar</Button>
+            <Button
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={encerrar.isPending || !dataEncerramento}
+              onClick={() => encerrandoId !== null && encerrar.mutate({ id: encerrandoId, dataEncerramento })}
+            >
+              Encerrar contrato
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

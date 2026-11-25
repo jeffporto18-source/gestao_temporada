@@ -372,6 +372,13 @@
       "when": 1786831261121,
       "tag": "0052_add_distribuicao_lucros_grupo",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "5",
+      "when": 1786831321121,
+      "tag": "0053_add_contrato_encerrado_em",
+      "breakpoints": true
     }
   ]
 }

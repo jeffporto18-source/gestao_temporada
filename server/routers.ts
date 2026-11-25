@@ -1492,6 +1492,29 @@ export const appRouter = router({
         if (contrato) await sincronizarCustosDoImovel(ctx.ownerId, contrato.propertyId);
       }),
 
+    // Encerramento antecipado: diferente de excluir, preserva o contrato e as parcelas já
+    // recebidas (histórico) — só cancela as pendentes de competência posterior à data escolhida e
+    // marca encerradoEm, o que libera o imóvel para um contrato novo (ver contratoCobreCompetencia).
+    encerrar: escritaProcedure
+      .input(z.object({ id: z.number(), dataEncerramento: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const contrato = await db.getLongTermContract(ctx.ownerId, input.id);
+        if (!contrato) throw new Error("Contrato não encontrado.");
+        if (input.dataEncerramento < contrato.dataInicio) {
+          throw new Error("A data de encerramento não pode ser antes do início do contrato.");
+        }
+        const competenciaEncerramento = input.dataEncerramento.slice(0, 7);
+        const parcelas = await db.listContractRentCharges(ctx.ownerId, input.id);
+        for (const p of parcelas) {
+          if (p.status !== "pendente" || p.competencia <= competenciaEncerramento) continue;
+          if (p.descontoLedgerEntryId) await db.deleteLedgerEntry(ctx.ownerId, p.descontoLedgerEntryId);
+          await db.deleteLedgerEntriesByContractRentCharge(ctx.ownerId, p.id);
+          await db.deleteContractRentCharge(ctx.ownerId, p.id);
+        }
+        await db.updateLongTermContract(ctx.ownerId, input.id, { encerradoEm: input.dataEncerramento });
+        await sincronizarCustosDoImovel(ctx.ownerId, contrato.propertyId);
+      }),
+
     // ---- recebíveis (parcelas) do contrato
     charges: empresaProcedure
       .input(z.object({ contractId: z.number().optional() }))

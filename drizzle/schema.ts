@@ -482,6 +482,11 @@ export const longTermContracts = mysqlTable("long_term_contracts", {
   dataInicio: date("dataInicio", { mode: "string" }).notNull(),
   dataFim: date("dataFim", { mode: "string" }).notNull(),
   dataReajuste: date("dataReajuste", { mode: "string" }),
+  // Preenchida só quando o contrato é encerrado ANTES do fim natural (dataFim). Diferente de
+  // excluir: o contrato e as parcelas já recebidas continuam no histórico, só as parcelas
+  // pendentes de competência posterior ao encerramento são removidas, e o imóvel fica livre para
+  // um contrato novo. Nulo = contrato segue vigente até dataFim (ou renovação) normalmente.
+  encerradoEm: date("encerradoEm", { mode: "string" }),
   // Valor do aluguel a partir de CADA data de reajuste (uma por ano de contrato, calculadas a
   // partir de dataInicio), preenchido manualmente — o índice de correção real só é conhecido na
   // data do reajuste, não dá pra calcular automaticamente no cadastro. Ao salvar, os valores são
